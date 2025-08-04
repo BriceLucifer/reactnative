@@ -1,43 +1,55 @@
-import { Image, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import ProfileDrawer from '@/components/ProfileDrawer';
+import React, { useState } from 'react';
+import {
+    Image,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-export default function Note(){
+export default function Note() {
+    const [isDrawerVisible, setDrawerVisible] = useState(false);
+
     const currentDate = new Date();
-    const formattedDate = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}/${currentDate.getDate().toString().padStart(2, '0')} ${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
+    const formattedDate = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}/${currentDate.getDate().toString().padStart(2, '0')} ${currentDate
+        .getHours()
+        .toString()
+        .padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
 
     const handleAddNote = () => {
-        // 添加笔记的逻辑
         console.log('Add note pressed');
     };
 
     const handleSearch = () => {
-        // 搜索功能
         console.log('Search pressed');
-        // 后续可以添加搜索页面导航或搜索模态框
     };
 
     const handleProfile = () => {
-        // 个人资料/设置功能
-        console.log('Profile/Settings pressed');
-        // 后续可以添加个人资料页面导航或设置页面
+        setDrawerVisible(true);
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-            
+
             {/* 顶部导航栏 */}
             <View style={styles.header}>
                 <Text style={styles.appTitle}>Shiro</Text>
                 <View style={styles.headerIcons}>
                     <TouchableOpacity style={styles.iconButton} onPress={handleSearch}>
-                        <Image 
-                            source={require('../../assets/images/chat.png')} 
+                        <Image
+                            source={require('../../assets/images/chat.png')}
                             style={styles.iconImage}
                         />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.iconButton} onPress={handleProfile}>
-                        <Image 
-                            source={require('../../assets/images/profile.png')} 
+                        <Image
+                            source={require('../../assets/images/profile.png')}
                             style={styles.iconImage}
                         />
                     </TouchableOpacity>
@@ -53,18 +65,19 @@ export default function Note(){
                     <Text style={styles.emptyStateSubtitle}>
                         Click on the plus, to add notes
                     </Text>
-                    
+
                     {/* 日期显示 */}
-                    <Text style={styles.dateText}>
-                        {formattedDate}
-                    </Text>
-                    
+                    <Text style={styles.dateText}>{formattedDate}</Text>
+
                     {/* 加号按钮 */}
                     <TouchableOpacity style={styles.addButton} onPress={handleAddNote}>
                         <Text style={styles.addButtonText}>+</Text>
                     </TouchableOpacity>
                 </View>
             </View>
+
+            {/* 抽屉组件 */}
+            <ProfileDrawer visible={isDrawerVisible} onClose={() => setDrawerVisible(false)} />
         </SafeAreaView>
     );
 }
@@ -99,7 +112,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 20,
-        // 添加轻微的背景色，增强点击反馈
         backgroundColor: 'transparent',
     },
     iconImage: {
@@ -158,5 +170,4 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         lineHeight: 28,
     },
-    
 });
