@@ -1,8 +1,18 @@
 // 登陆界面
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import React from 'react';
 import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Index() {
+    const handleAppleLogin = () => {
+        router.push('/screens/Permission');
+    };
+
+    const handleGoogleLogin = () => {
+        router.push('/screens/Permission');
+    };
+
     return (
       <ImageBackground 
         source={require('../assets/images/background.png')} 
@@ -23,17 +33,24 @@ export default function Index() {
 
           {/* 登录按钮区域 */}
           <View style={styles.buttonContainer}>
-            {/* Apple 登录按钮 */}
-            <TouchableOpacity style={styles.appleButton}>
-              <Image 
-                source={require('../assets/images/apple.png')} 
-                style={styles.buttonIcon}
-              />
-              <Text style={styles.appleButtonText}>Continue with Apple</Text>
+            {/* Apple 登录按钮 - 使用渐变 */}
+            <TouchableOpacity onPress={handleAppleLogin}>
+              <LinearGradient
+                colors={['#4A4849', '#292927']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.appleButton}
+              >
+                <Image 
+                  source={require('../assets/images/apple.png')} 
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.appleButtonText}>Continue with Apple</Text>
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Google 登录按钮 */}
-            <TouchableOpacity style={styles.googleButton}>
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
               <Image 
                 source={require('../assets/images/google.png')} 
                 style={styles.buttonIcon}
@@ -55,22 +72,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 100,
+    paddingTop: 90, // 保持原来的值
     paddingBottom: 50,
   },
   headerContainer: {
     alignItems: 'center',
     marginBottom: 60,
+    marginTop: 60, // 增加顶部边距，让标题往下移动
   },
   headerTypography: {
-    fontFamily: 'Gilroy-ExtraBold',
-    fontWeight: '700',         
     fontSize: 32,              
-    lineHeight: 40,          
-    letterSpacing: 0,          
+    lineHeight: 48,          
+    letterSpacing: -0.5,          
     textAlign: 'center',       
     color: '#020F20',
-    maxWidth: 300,
+    maxWidth: 400,
+    fontWeight: 'bold', // 使用系统字体的粗体
   },
   decorationContainer: {
     flex: 1,
@@ -84,12 +101,12 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   buttonContainer: {
-    gap: 16,
-    marginBottom: 40,
+    gap: 20,
+    marginBottom: 40, // 从40增加到80，让按钮往上移动
   },
   appleButton: {
     backgroundColor: '#000000',
-    borderRadius: 25,
+    borderRadius: 30,
     height: 60,
     flexDirection: 'row',
     alignItems: 'center',
@@ -97,15 +114,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
+    backgroundColor: 'transparent', // 改为透明
+    borderRadius: 30, // 保持和Apple按钮一致的圆角
     height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.98)', // 半透明白色边框
   },
   buttonIcon: {
     width: 26,
@@ -115,12 +132,12 @@ const styles = StyleSheet.create({
   },
   appleButtonText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
   },
   googleButtonText: {
-    color: '#000000',
-    fontSize: 20,
+    color: '#020F20',
+    fontSize: 18,
     fontWeight: '600',
   },
 });
