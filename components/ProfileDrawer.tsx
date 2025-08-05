@@ -125,8 +125,7 @@ const handleFeedBack = () => {
             <MenuItem icon={require('../assets/images/telegram.png')} label="Telegram" onPress={handleTelegram} />
             <MenuItem icon={require('../assets/images/lock.png')} label="Password Lock" onPress={handlePassword}/>
             <MenuItem icon={require('../assets/images/feedback.png')} label="Feedback" onPress={handleFeedBack}/>
-            <MenuItem icon={require('../assets/images/logout.png')} label="Sign out" />
-
+            <MenuItem icon={require('../assets/images/logout.png')} label="Sign out" onPress={() => router.push("/")} />
           </View>
         </Animated.View>
       </GestureDetector>
