@@ -60,7 +60,7 @@ export default function Note() {
             <View style={styles.mainContent}>
                 <View style={styles.emptyStateContainer}>
                     <Text style={styles.emptyStateTitle}>
-                        You haven't added anything yet
+                        You haven&#39;t added anything yet
                     </Text>
                     <Text style={styles.emptyStateSubtitle}>
                         Click on the plus, to add notes

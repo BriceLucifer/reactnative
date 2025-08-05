@@ -19,6 +19,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import {router} from "expo-router";
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = width * 0.80;
@@ -31,14 +32,33 @@ interface ProfileDrawerProps {
 export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) {
   const translateX = useSharedValue(DRAWER_WIDTH);
 
+// Discord 页面跳转
+const handleDiscord = () => {
+  router.push('/screens/Discord');
+}
+
+// Telegram 页面跳转
+const handleTelegram = () => {
+  router.push("/screens/Telegram")
+}
+
+// Password Lock page 跳转
+const handlePassword = () => {
+  router.push("/screens/PasswordLock")
+}
+
+// Feedback 页面跳转
+const handleFeedBack = () => {
+  router.push("/screens/Feedback")
+}
+
   useEffect(() => {
     translateX.value = visible ? withSpring(0) : withTiming(DRAWER_WIDTH);
   }, [visible]);
 
   const gesture = Gesture.Pan()
     .onUpdate((event) => {
-      const offset = Math.max(0, event.translationX);
-      translateX.value = offset;
+      translateX.value = Math.max(0, event.translationX);
     })
     .onEnd(() => {
       if (translateX.value > DRAWER_WIDTH * 0.3) {
@@ -92,7 +112,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
               <View style={[styles.progressBar, { width: '20%' }]} />
             </View>
             <Text style={styles.usageHint}>
-                You've used 8 AI conversations this month. Upgrade for unlimited access.
+                You&#39;ve used 8 AI conversations this month. Upgrade for unlimited access.
             </Text>
             <TouchableOpacity style={styles.upgradeButton}>
               <Text style={styles.upgradeText}>Upgrade to Pro</Text>
@@ -101,11 +121,12 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
 
           {/* 菜单 */}
           <View style={styles.menuList}>
-            <MenuItem icon={require('../assets/images/discord.png')} label="Discord" />
-            <MenuItem icon={require('../assets/images/telegram.png')} label="Telegram" />
-            <MenuItem icon={require('../assets/images/lock.png')} label="Password Lock" />
-            <MenuItem icon={require('../assets/images/feedback.png')} label="Feedback" />
+            <MenuItem icon={require('../assets/images/discord.png')} label="Discord" onPress={handleDiscord} />
+            <MenuItem icon={require('../assets/images/telegram.png')} label="Telegram" onPress={handleTelegram} />
+            <MenuItem icon={require('../assets/images/lock.png')} label="Password Lock" onPress={handlePassword}/>
+            <MenuItem icon={require('../assets/images/feedback.png')} label="Feedback" onPress={handleFeedBack}/>
             <MenuItem icon={require('../assets/images/logout.png')} label="Sign out" />
+
           </View>
         </Animated.View>
       </GestureDetector>
@@ -113,9 +134,9 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
   );
 }
 
-function MenuItem({ icon, label }: { icon: any; label: string }) {
+function MenuItem({ icon, label, onPress}: { icon: any; label: string, onPress?: () => void }) {
   return (
-    <TouchableOpacity style={styles.menuItem}>
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <Image source={icon} style={styles.menuIcon} />
       <Text style={styles.menuLabel}>{label}</Text>
     </TouchableOpacity>
