@@ -34,7 +34,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
 
 // Discord 页面跳转
 const handleDiscord = () => {
-  router.push('/screens/Discord');
+  router.push('/screens/DiscordLink');
 }
 
 // Telegram 页面跳转

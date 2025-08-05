@@ -13,11 +13,11 @@ import CustomButton from "@/components/CustomButton";
 
 const backIcon = require('../../assets/images/back.png');
 
-const Discord = () => {
+const DiscordLink= () => {
     const [discordId, setDiscordId] = useState('');
     const [showModal, setShowModal] = useState(false);
 
-    const handleSave = () => {
+    const handleSave= () => {
         console.log('Save button clicked with Discord ID:', discordId);
         // 可在此添加保存逻辑，如 API 请求
     };
@@ -87,7 +87,7 @@ const Discord = () => {
     );
 };
 
-export default Discord;
+export default DiscordLink;
 
 // 样式表（含详细注释）
 const styles = StyleSheet.create({
