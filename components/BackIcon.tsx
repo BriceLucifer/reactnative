@@ -2,6 +2,7 @@ import {Image, StyleSheet, TouchableOpacity} from "react-native";
 import {router} from "expo-router";
 import React from "react";
 
+// For the Back Icon with back function
 export default function BackIcon() {
     const BackIcon = require("../assets/images/back.png");
     return (
