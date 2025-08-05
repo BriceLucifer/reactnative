@@ -9,7 +9,7 @@ import {
     Image, // 引入 Image 用于显示 back.png
 } from 'react-native';
 import { router } from 'expo-router';
-import {LinearGradient} from "expo-linear-gradient";
+import CustomButton from "@/components/CustomButton";
 
 const backIcon = require('../../assets/images/back.png');
 
@@ -59,16 +59,7 @@ const Discord = () => {
             </Text>
 
             {/* 保存按钮 */}
-            <TouchableOpacity onPress={handleSave}>
-                <LinearGradient
-                    colors={['#4A4849', '#292927']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.saveButton}
-                >
-                    <Text style={styles.saveButtonText}>Save</Text>
-                </LinearGradient>
-            </TouchableOpacity>
+            <CustomButton onPress={handleSave} text={"Save"} />
 
             {/* “如何连接”提示按钮 */}
             <TouchableOpacity onPress={toggleModal} style={styles.connectButton}>

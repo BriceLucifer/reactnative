@@ -6,7 +6,7 @@ type Props = {
     text: string;
 }
 
-export default function Button({onPress, text}: Props) {
+export default function CustomButton({onPress, text}: Props) {
     return (
         <TouchableOpacity onPress={onPress}>
             <LinearGradient

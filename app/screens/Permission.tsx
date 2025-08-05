@@ -2,6 +2,8 @@
 
 import { router } from 'expo-router';
 import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import BackIcon from "@/components/BackIcon";
+import CustomButton from "@/components/CustomButton";
 
 export default function Permission(){
     const handleBack = () => {
@@ -18,15 +20,10 @@ export default function Permission(){
             style={styles.backgroundImage} 
             resizeMode="cover"
         >
+
             <View style={styles.container}>
                 {/* 顶部区域：返回按钮和白色基线 */}
-                <View style={styles.topSection}>
-                    <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                        <Text style={styles.backArrow}>‹</Text>
-                    </TouchableOpacity>
-                    {/* 白色基线 */}
-                    <View style={styles.whiteLine} />
-                </View>
+                    <BackIcon></BackIcon>
 
                 {/* 标题区域 - 居中 */}
                 <View style={styles.titleContainer}>
@@ -73,10 +70,7 @@ export default function Permission(){
                     </View>
                 </View>
 
-                {/* 继续按钮 */}
-                <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-                    <Text style={styles.continueButtonText}>Continue</Text>
-                </TouchableOpacity>
+                <CustomButton onPress={handleContinue} text={'Continue'} />
             </View>
         </ImageBackground>
     )
@@ -84,6 +78,7 @@ export default function Permission(){
 
 const styles = StyleSheet.create({
     backgroundImage: {
+        backgroundColor: '#FFFFFF',
         flex: 1,
         width: '100%',
         height: '100%',
@@ -91,44 +86,24 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        paddingHorizontal: 30,
-        paddingTop: 60,
-        paddingBottom: 40,
+        paddingHorizontal: 25,
+        paddingTop: 30,
+        paddingBottom: 30,
         transform: [{ scaleY: -1 }], // 内容再翻转回来
     },
-    topSection: {
-        marginBottom: 50,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        marginBottom: 16,
-    },
-    backArrow: {
-        fontSize: 40,
-        color: '#020F20',
-        fontStyle: 'normal',
-        lineHeight: 50,
-    },
-    whiteLine: {
-        height: 2,
-        backgroundColor: '#FFFFFF',
-        width: '100%',
-        opacity: 0.3,
-    },
+
+    // title
     titleContainer: {
         alignItems: 'center', // 标题居中
         marginBottom: 10,
+        marginTop: 80,
     },
     title: {
         color: '#020F20',
         fontSize: 36,
         fontWeight: '600',
         lineHeight: 50,
-        marginBottom: 24,
+        marginBottom: 20,
         textAlign: 'center',
     },
     subtitle: {
@@ -150,8 +125,8 @@ const styles = StyleSheet.create({
         gap: 12,
         alignSelf: 'stretch',
         backgroundColor: '#FFF',
-        borderRadius: 26,
-        marginBottom: 14,
+        borderRadius: 24,
+        marginBottom: 20,
         borderWidth: 1,
         borderColor: '#E7EAED',
         // 添加阴影效果
@@ -160,7 +135,7 @@ const styles = StyleSheet.create({
             width: 0,
             height: 10,
         },
-        shadowOpacity: 0.06,
+        shadowOpacity: 0.07,
         shadowRadius: 20,
         elevation: 10, // Android 阴影
     },
