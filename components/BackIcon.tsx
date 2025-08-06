@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
     backButton: {
         marginTop: 10, // 距离顶部 10px
         marginLeft: 5, // 可选：微调左侧位置
-        width: 30, // 设置宽度，便于点击
+        width: 40, // 设置宽度，便于点击
         height: 30, // 设置高度
         justifyContent: 'center', // 垂直居中（如果用 Flex 布局）
         alignItems: 'center', // 水平居中

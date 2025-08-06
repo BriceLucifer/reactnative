@@ -26,7 +26,7 @@ export default function Note() {
     };
 
     const handleSearch = () => {
-        console.log('Search pressed');
+        console.log('Chat pressed');
     };
 
     const handleProfile = () => {
