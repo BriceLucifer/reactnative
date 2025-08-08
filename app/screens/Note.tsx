@@ -1,4 +1,5 @@
 import ProfileDrawer from '@/components/ProfileDrawer';
+import ChatDialog from '@/components/ChatDialog';
 import React, { useState } from 'react';
 import {
     Image,
@@ -13,6 +14,9 @@ import {
 export default function Note() {
     const [isDrawerVisible, setDrawerVisible] = useState(false);
 
+    // 控制chat
+    const [showChatDialog, setShowChatDialog] = useState(false);
+
     const currentDate = new Date();
     const formattedDate = `${currentDate.getFullYear()}/${(currentDate.getMonth() + 1)
         .toString()
@@ -25,8 +29,8 @@ export default function Note() {
         console.log('Add note pressed');
     };
 
-    const handleSearch = () => {
-        console.log('Chat pressed');
+    const handleAIChat= () => {
+        setShowChatDialog(true);
     };
 
     const handleProfile = () => {
@@ -41,7 +45,7 @@ export default function Note() {
             <View style={styles.header}>
                 <Text style={styles.appTitle}>Shiro</Text>
                 <View style={styles.headerIcons}>
-                    <TouchableOpacity style={styles.iconButton} onPress={handleSearch}>
+                    <TouchableOpacity style={styles.iconButton} onPress={handleAIChat}>
                         <Image
                             source={require('../../assets/images/chat.png')}
                             style={styles.iconImage}
@@ -78,6 +82,10 @@ export default function Note() {
 
             {/* 抽屉组件 */}
             <ProfileDrawer visible={isDrawerVisible} onClose={() => setDrawerVisible(false)} />
+
+            {/* Chat 弹窗组件 */}
+            <ChatDialog visible={showChatDialog} onClose={() => setShowChatDialog(false)} />
+
         </SafeAreaView>
     );
 }

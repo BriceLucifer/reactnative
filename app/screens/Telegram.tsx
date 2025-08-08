@@ -2,31 +2,39 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    TextInput,
     StyleSheet,
     TouchableOpacity,
     Modal,
     Image,
     Dimensions,
+    Pressable,
+    Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import CustomButton from "@/components/CustomButton";
+import PhoneInput from 'react-native-phone-number-input';
 
 const backIcon = require('../../assets/images/back.png');
 const closeIcon = require('../../assets/images/backx.png');
 
+const PhoneInputComponent = PhoneInput as unknown as React.ComponentType<any>;
 const { height: screenHeight } = Dimensions.get('window');
 
 const Telegram = () => {
-    const [discordId, setDiscordId] = useState('');
     const [showModal, setShowModal] = useState(false);
+    const [value, setValue] = useState('');
+    const [formattedValue, setFormattedValue] = useState('');
+
+    const toggleModal = () => setShowModal(!showModal);
 
     const handleSave = () => {
-        console.log('Save button clicked with Discord ID:', discordId);
-    };
+        if (!formattedValue || formattedValue.length < 10 || !formattedValue.startsWith('+')) {
+            Alert.alert("Invalid Number", "Please enter a valid international phone number.");
+            return;
+        }
 
-    const toggleModal = () => {
-        setShowModal(!showModal);
+        console.log('Phone number saved:', formattedValue);
+        // 可发送至后端
     };
 
     return (
@@ -44,53 +52,53 @@ const Telegram = () => {
                 Link your Telegram account to Shiro so you can easily send text, images, and voice messages directly to Shiro for centralized storage and AI-powered feedback.
             </Text>
 
-            {/* 输入框等 */}
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Telegram mobile number"
-                value={discordId}
-                onChangeText={setDiscordId}
-                keyboardType="default"
+            {/* 电话输入框 */}
+            <PhoneInputComponent
+                defaultValue={value}
+                defaultCode="US"
+                layout="first"
+                onChangeText={(text: string) => setValue(text)}
+                onChangeFormattedText={(text: string) => setFormattedValue(text)}
+                withDarkTheme
+                withShadow
+                containerStyle={styles.phoneInputContainer}
+                textContainerStyle={styles.phoneInputTextContainer}
+                codeTextStyle={styles.codeTextStyle}
             />
 
             <Text style={styles.instructions}>
                 Please enter your Telegram registered mobile phone number, including the international dialing code, e.g. +1 13812345678
             </Text>
 
-            <CustomButton onPress={handleSave} text={"Save"} />
+            <CustomButton onPress={handleSave} text="Save" />
 
+            {/* 说明按钮 */}
             <TouchableOpacity onPress={toggleModal} style={styles.connectButton}>
                 <Text style={styles.connectButtonText}>How to connect</Text>
             </TouchableOpacity>
 
-            {/* 模态框 */}
+            {/* 弹窗 */}
             <Modal
                 visible={showModal}
-                animationType="slide" // 滑动动画
+                animationType="slide"
                 transparent={true}
-                // 可选：添加关闭回调监听，进一步控制动画
-                onRequestClose={toggleModal} // Android 返回键支持
+                onRequestClose={toggleModal}
             >
-                <TouchableOpacity
-                    style={styles.modalBackground}
-                    activeOpacity={1} // 点击背景区域时，不透明度不变
-                    onPress={toggleModal}
-                >
-                    {/* ✅ 使用内联 style 设置动态高度 */}
-                    <View style={[styles.modalContainer, { height: screenHeight * 0.65 }]}>
+                <Pressable style={styles.modalBackground} onPress={toggleModal}>
+                    <View style={[styles.modalContainer, { height: screenHeight * 0.75 }]}>
                         <TouchableOpacity onPress={toggleModal} style={styles.closeButton}>
                             <Image source={closeIcon} style={styles.closeButtonImage} />
                         </TouchableOpacity>
                         <Text style={styles.modalTitle}>How to connect</Text>
                         <Text style={styles.modalContent}>
                             1. Enter your Telegram phone number above.
-                            {'\n'}👉 Make sure to include your country code (for example: +1 4151234567).
+                            {'\n'}👉 Make sure to include your country code (e.g. +1 4151234567).
                             {'\n\n'}2. Tap Save.
                             {'\n\n'}3. Open Telegram and search for @ShiroAI_Bot, or click here.
                             {'\n\n'}4. Start a conversation with ShiroAI_Bot and send your first message – text, photo, or voice.
                         </Text>
                     </View>
-                </TouchableOpacity>
+                </Pressable>
             </Modal>
         </View>
     );
@@ -101,14 +109,13 @@ export default Telegram;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingTop: 40,
         backgroundColor: '#fff',
     },
     backButton: {
-        marginTop: 10,
-        marginLeft: 5,
-        width: 30,
-        height: 30,
+        width: 40,
+        height: 40,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -120,9 +127,9 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginTop: 60,
+        marginTop: 30,
         textAlign: 'center',
-        color: '#020F20'
+        color: '#020F20',
     },
     subtitle: {
         fontSize: 15,
@@ -130,36 +137,26 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#9A9FA6',
     },
-    input: {
+    phoneInputContainer: {
         height: 60,
-        borderColor: '#ccc',
-        borderWidth: 1,
-        borderRadius: 12,
-        marginVertical: 22,
+        borderRadius: 22,
+        marginTop: 24,
+        width: '100%',
+        backgroundColor: '#f0f0f0',
+    },
+    phoneInputTextContainer: {
+        borderRadius: 22,
         paddingHorizontal: 18,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#fff',
+    },
+    codeTextStyle: {
         fontSize: 16,
-        color: '#9A9FA6'
-    },
-    saveButton: {
-        backgroundColor: '#000000',
-        borderRadius: 30,
-        height: 60,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 20,
-        marginTop: 14,
-        marginBottom: 10,
-    },
-    saveButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
+        color: '#020F20',
     },
     instructions: {
-        fontSize: 16,
-        marginBottom: 8,
+        fontSize: 14,
+        marginTop: 10,
+        marginBottom: 20,
         color: '#9A9FA6',
         lineHeight: 20,
     },
@@ -181,7 +178,6 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 20,
-        // 高度由外部动态注入，这里不设固定 height
     },
     closeButton: {
         position: 'absolute',
@@ -200,7 +196,6 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         fontSize: 16,
-        marginBottom: 20,
         textAlign: 'left',
         lineHeight: 24,
         color: '#020F20',
