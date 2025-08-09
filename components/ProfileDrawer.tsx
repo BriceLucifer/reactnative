@@ -54,7 +54,7 @@ const handleFeedBack = () => {
 
   useEffect(() => {
     translateX.value = visible ? withSpring(0) : withTiming(DRAWER_WIDTH);
-  }, [visible]);
+  }, [translateX, visible]);
 
   const gesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -109,7 +109,8 @@ const handleFeedBack = () => {
           <View style={styles.usageBox}>
             <Text style={styles.usageTitle}>Free Plan Usage</Text>
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: '20%' }]} />
+                {/*这里修改进度条*/}
+              <View style={[styles.progressBar, { width: '75%' }]} />
             </View>
             <Text style={styles.usageHint}>
                 You&#39;ve used 8 AI conversations this month. Upgrade for unlimited access.

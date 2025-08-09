@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Modal,
     View,
@@ -9,50 +9,123 @@ import {
     Dimensions,
     TextInput,
     Image,
-    ScrollView, // Import ScrollView to display messages
+    ScrollView,
 } from 'react-native';
 
-// Get the screen height to calculate the modal height
 const { height: screenHeight } = Dimensions.get('window');
 
-// Define the structure for a single message
+// Defines the structure for a single message object.
 type Message = {
     text: string;
-    type: 'user' | 'ai';
+    type: 'user' | 'ai'; // 'user' for messages sent by the user, 'ai' for responses.
 };
 
-// Define the component's props
+// Defines the props accepted by the ChatDialog component.
 type ChatDialogProps = {
-    visible: boolean;
-    onClose: () => void;
+    visible: boolean; // Controls the visibility of the modal.
+    onClose: () => void; // Function to call when the modal should be closed.
 };
 
 /**
- * A reusable slide-up modal component with full chat functionality.
- * It appears from the bottom, supports sending messages, and displays a conversation.
- * @param {boolean} visible - Controls whether the modal is visible.
- * @param {() => void} onClose - Function to call when the modal should be closed.
+ * A slide-up chat dialog component that simulates a conversation with an AI.
+ * It waits for the user to stop sending messages and typing before generating a response.
+ * The AI's response concatenates all messages the user sent in their last "turn".
+ * @param {ChatDialogProps} props - The component's props.
  */
 export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
-    // State to hold the current value of the text input
+    // --- STATE MANAGEMENT ---
+    // Stores the current text in the input field.
     const [inputValue, setInputValue] = useState('');
-    // State to hold the list of all messages in the conversation
+    // Stores the entire conversation history as an array of Message objects.
     const [messages, setMessages] = useState<Message[]>([
         { text: 'How are you doing lately?', type: 'ai' },
     ]);
 
-    // Function to handle sending a message
+    // --- REFS ---
+    // Holds the timer ID for the AI's response delay. Using a ref prevents re-renders.
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    // Holds a reference to the ScrollView to enable automatic scrolling.
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // --- EFFECTS ---
+
+    /**
+     * This is the core effect that manages the AI's response logic.
+     * It runs whenever the user sends a message (changing `messages`) OR types in the input
+     * (changing `inputValue`), allowing it to cancel the AI's response if the user is active.
+     */
+    useEffect(() => {
+        // 1. Always clear any existing timer.
+        // This is the crucial step that "resets" the AI's response countdown
+        // every time the user takes an action (sends a message or types).
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // 2. Define the conditions for the AI to respond.
+        const lastMessage = messages[messages.length - 1];
+        const userIsNotTyping = inputValue.trim() === '';
+
+        // 3. Set a new timer ONLY if the user has just sent a message AND is not currently typing.
+        if (lastMessage && lastMessage.type === 'user' && userIsNotTyping) {
+            // Start a 3-second countdown.
+            // @ts-ignore
+            timerRef.current = setTimeout(() => {
+                // --- AI Response Generation Logic ---
+
+                // Find the index of the last AI message to define the start of the user's "turn".
+                const lastAiMessageIndex = messages.map(m => m.type).lastIndexOf('ai');
+
+                // Slice the array to get all user messages sent since the last AI response.
+                const userMessagesInTurn = messages.slice(lastAiMessageIndex + 1);
+
+                // Extract the text from each message and join them into a single string.
+                const concatenatedText = userMessagesInTurn
+                    .map((msg) => msg.text)
+                    .join('; '); // Using '; ' as a separator.
+
+                // Create the new AI response message.
+                const aiResponse: Message = {
+                    text: `I received: "${concatenatedText}"`,
+                    type: 'ai',
+                };
+
+                // Add the AI's response to the conversation history.
+                setMessages((prevMessages) => [...prevMessages, aiResponse]);
+            }, 3000); // 3-second (3000ms) delay.
+        }
+
+        // Cleanup function: This will be called if the component unmounts.
+        // It ensures no timers are left running in the background.
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, [messages, inputValue]); // Dependencies: The effect re-runs if `messages` or `inputValue` changes.
+
+    /**
+     * This effect handles automatically scrolling to the bottom of the chat
+     * whenever a new message is added to the conversation.
+     */
+    useEffect(() => {
+        if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+    }, [messages]); // Dependency: Runs only when the `messages` array changes.
+
+    /**
+     * Handles the action of sending a user's message.
+     * It adds the new message to the state and clears the input field.
+     */
     const handleSendMessage = () => {
-        // Only send if there is text in the input
         if (inputValue.trim()) {
-            // Add the new user message to the messages array
             setMessages([...messages, { text: inputValue, type: 'user' }]);
-            // Clear the input field
             setInputValue('');
         }
     };
 
-    // Determine which icon to show based on whether there is input
+    // Determines whether to show the "send" icon or the "microphone" icon.
     const showSendIcon = inputValue.trim().length > 0;
 
     return (
@@ -63,13 +136,17 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
             onRequestClose={onClose}
         >
             <Pressable style={styles.modalBackground} onPress={onClose}>
+                {/* By stopping propagation, tapping inside the modal won't close it. */}
                 <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
-                    {/* Use a ScrollView to display the chat messages */}
-                    <ScrollView style={styles.messagesContainer}>
+                    <ScrollView
+                        ref={scrollViewRef}
+                        style={styles.messagesContainer}
+                        contentContainerStyle={{ paddingBottom: 10 }}
+                    >
                         {messages.map((message, index) => (
                             <View key={index}>
                                 {message.type === 'ai' ? (
-                                    // AI message bubble
+                                    // AI Message Bubble
                                     <View style={styles.chatMessageContainer}>
                                         <View style={styles.avatar}>
                                             <Image
@@ -82,7 +159,7 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
                                         </View>
                                     </View>
                                 ) : (
-                                    // User message bubble
+                                    // User Message Bubble
                                     <View style={styles.userMessageContainer}>
                                         <View style={styles.userChatBubble}>
                                             <Text style={styles.userChatText}>{message.text}</Text>
@@ -104,11 +181,10 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
                         />
                         <TouchableOpacity style={[styles.actionButton, showSendIcon && styles.sendButtonActive]} onPress={handleSendMessage}>
                             <Image
-                                // Conditionally change the icon source using local assets
                                 source={
                                     showSendIcon
-                                        ? require('@/assets/images/send.png') // <-- YOUR SEND ICON LOCAL PATH
-                                        : require('@/assets/images/record.png') // <-- YOUR MICROPHONE ICON LOCAL PATH
+                                        ? require('@/assets/images/send.png')
+                                        : require('@/assets/images/record.png')
                                 }
                                 style={showSendIcon ? styles.sendImage : styles.micImage}
                             />
@@ -120,7 +196,6 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
     );
 }
 
-// Define the styles for the component
 const styles = StyleSheet.create({
     modalBackground: {
         flex: 1,
@@ -137,14 +212,13 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     messagesContainer: {
-        flex: 1, // Allows the scroll view to take up available space
+        flex: 1,
     },
-    // AI message styles
     chatMessageContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         marginTop: 18,
-        marginRight: '20%', // Ensure AI bubbles don't take full width
+        marginRight: '20%',
     },
     avatar: {
         width: 45,
@@ -168,12 +242,11 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: '#020F20',
     },
-    // User message styles
     userMessageContainer: {
         flexDirection: 'row',
-        justifyContent: 'flex-end', // Aligns user messages to the right
+        justifyContent: 'flex-end',
         marginTop: 18,
-        marginLeft: '20%', // Ensure user bubbles don't take full width
+        marginLeft: '20%',
     },
     userChatBubble: {
         backgroundColor: '#F3F3F3',
@@ -186,26 +259,23 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: '#020F20',
     },
-    // Input bar styles
     inputBarContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF', // Background color is needed for shadow
+        backgroundColor: '#FFFFFF',
         borderRadius: 14,
         paddingLeft: 20,
         paddingRight: 18,
         marginBottom: 11,
         marginTop: 10,
-        // Shadow for iOS
         shadowColor: 'rgba(0,0,0,0.88)',
         shadowOffset: {
             width: 0,
             height: 2,
         },
-        height: 60,
+        height: 55,
         shadowOpacity: 0.2,
         shadowRadius: 3.8,
-        // Elevation for Android
         elevation: 6,
     },
     textInput: {
@@ -223,7 +293,7 @@ const styles = StyleSheet.create({
     },
     sendButtonActive: {
         backgroundColor: '#020F20',
-        borderRadius: 15, // Corrected: Half of width/height to make it a circle
+        borderRadius: 15,
     },
     micImage: {
         width: 26,
@@ -232,6 +302,5 @@ const styles = StyleSheet.create({
     sendImage: {
         width: 20,
         height: 22,
-        tintColor: '#FFFFFF', // Makes the send icon image white
     },
 });
