@@ -11,7 +11,7 @@ export default function Permission(){
     };
 
     const handleContinue = () => {
-        router.push('/screens/Note');
+        router.push('/screens/NoteProfile');
     };
 
     return (

@@ -11,7 +11,7 @@ import {
     View,
 } from 'react-native';
 
-export default function Note() {
+export default function NoteProfile() {
     const [isDrawerVisible, setDrawerVisible] = useState(false);
 
     // 控制chat
