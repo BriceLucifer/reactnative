@@ -10,14 +10,26 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Shiro"
+      "bundleIdentifier": "com.anonymous.Shiro",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "Shiro 需要访问您的日历，以便为您建议合适的反思时刻。",
+        "NSLocationWhenInUseUsageDescription": "Shiro 需要使用您的位置信息，以便在您所在的地方提供贴心的提示。",
+        "NSMotionUsageDescription": "Shiro 使用运动数据来提高基于位置的建议的准确性。"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.Shiro",
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +46,10 @@
           "resizeMode": "cover",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-notifications",
+      "expo-calendar",
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true

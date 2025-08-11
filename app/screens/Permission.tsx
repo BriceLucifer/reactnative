@@ -1,29 +1,46 @@
 // permission 界面
 
 import { router } from 'expo-router';
-import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ImageBackground, StyleSheet, Text, View, Alert } from "react-native";
 import BackIcon from "@/components/BackIcon";
 import CustomButton from "@/components/CustomButton";
 
-export default function Permission(){
-    const handleBack = () => {
-        router.back();
-    };
+// Import the necessary modules from Expo
+import * as Notifications from 'expo-notifications';
+import * as Calendar from 'expo-calendar';
+import * as Location from 'expo-location';
 
-    const handleContinue = () => {
-        router.push('/screens/NoteProfile');
+export default function Permission(){
+
+    // Make the function async to await the permission requests
+    const handleContinue = async () => {
+        try {
+            // Request permissions one by one.
+            // This shows the user a sequence of native pop-ups.
+            await Notifications.requestPermissionsAsync();
+            await Calendar.requestCalendarPermissionsAsync();
+            await Location.requestForegroundPermissionsAsync();
+
+        } catch (error) {
+            // Handle any unexpected errors during the permission requests
+            console.error("Error requesting permissions:", error);
+            Alert.alert("Error", "Could not request permissions. Please try again later.");
+        } finally {
+            // Whether permissions were granted or denied, navigate to the next screen.
+            // Your app should gracefully handle cases where permissions are not available.
+            router.push('/screens/NoteListScreen');
+        }
     };
 
     return (
-        <ImageBackground 
-            source={require('../../assets/images/background.png')}  
-            style={styles.backgroundImage} 
+        <ImageBackground
+            source={require('../../assets/images/background.png')}
+            style={styles.backgroundImage}
             resizeMode="cover"
         >
-
             <View style={styles.container}>
                 {/* 顶部区域：返回按钮和白色基线 */}
-                    <BackIcon></BackIcon>
+                <BackIcon />
 
                 {/* 标题区域 - 居中 */}
                 <View style={styles.titleContainer}>
@@ -35,8 +52,8 @@ export default function Permission(){
                 <View style={styles.permissionsContainer}>
                     {/* 通知权限 */}
                     <View style={styles.permissionCard}>
-                        <Image 
-                            source={require('../../assets/images/notification.png')} 
+                        <Image
+                            source={require('../../assets/images/notification.png')}
                             style={styles.iconImage}
                         />
                         <View style={styles.permissionContent}>
@@ -47,10 +64,10 @@ export default function Permission(){
 
                     {/* 日历权限 */}
                     <View style={styles.permissionCard}>
-                            <Image 
-                                source={require('../../assets/images/calendar.png')} 
-                                style={styles.iconImage}
-                            />
+                        <Image
+                            source={require('../../assets/images/calendar.png')}
+                            style={styles.iconImage}
+                        />
                         <View style={styles.permissionContent}>
                             <Text style={styles.permissionTitle}>Calendar</Text>
                             <Text style={styles.permissionDescription}>To suggest good moments for reflection.</Text>
@@ -59,10 +76,10 @@ export default function Permission(){
 
                     {/* 位置权限 */}
                     <View style={styles.permissionCard}>
-                            <Image 
-                                source={require('../../assets/images/location.png')} 
-                                style={styles.iconImage}
-                            />
+                        <Image
+                            source={require('../../assets/images/location.png')}
+                            style={styles.iconImage}
+                        />
                         <View style={styles.permissionContent}>
                             <Text style={styles.permissionTitle}>Location</Text>
                             <Text style={styles.permissionDescription}>To offer thoughtful prompts wherever {'\n'}you are.</Text>
@@ -91,10 +108,8 @@ const styles = StyleSheet.create({
         paddingBottom: 30,
         transform: [{ scaleY: -1 }], // 内容再翻转回来
     },
-
-    // title
     titleContainer: {
-        alignItems: 'center', // 标题居中
+        alignItems: 'center',
         marginBottom: 10,
         marginTop: 80,
     },
@@ -129,7 +144,6 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#E7EAED',
-        // 添加阴影效果
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -137,7 +151,7 @@ const styles = StyleSheet.create({
         },
         shadowOpacity: 0.07,
         shadowRadius: 20,
-        elevation: 10, // Android 阴影
+        elevation: 10,
     },
     iconImage: {
         width: 20,
@@ -147,7 +161,7 @@ const styles = StyleSheet.create({
     },
     permissionContent: {
         flex: 1,
-        justifyContent: 'center', // 添加这行，让文字内容垂直居中
+        justifyContent: 'center',
     },
     permissionTitle: {
         color: '#020F20',
@@ -161,17 +175,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '400',
         lineHeight: 24,
-    },
-    continueButton: {
-        backgroundColor: '#333231',
-        borderRadius: 27,
-        height: 54,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    continueButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '600'
     },
 });
