@@ -1,5 +1,3 @@
-// File: app/(tabs)/NoteListScreen.tsx
-
 import ProfileDrawer from '@/components/ProfileDrawer';
 import ChatDialog from '@/components/ChatDialog';
 import React, { useRef, useState } from 'react';
@@ -37,6 +35,10 @@ const LIST_TOP_PADDING = HEADER_TOP_OFFSET + 10; // 列表为浮动头部让出�
 // 动画范围：向下滚动多少像素时完成缩小/渐隐
 const COLLAPSE_RANGE = 80;
 
+// ✅ 你的 Appwrite 本地音频 URL（可直接播）
+const LOCAL_ADMIN_AUDIO_URL =
+    'http://localhost/v1/storage/buckets/689b2283000a1eb4930c/files/689b2294000e0c2dfbbc/view?project=688a534b000dacc7f1c8&mode=admin';
+
 export default function NoteListScreen() {
     const [isDrawerVisible, setDrawerVisible] = useState(false);
     const [showChatDialog, setShowChatDialog] = useState(false);
@@ -55,7 +57,8 @@ export default function NoteListScreen() {
             updatedAt: '2025/06/16 12:24',
             content: [
                 { type: 'text', value: 'It is not enough to just translate the language.' },
-                { type: 'audio', url: 'path/to/audio.mp3', duration: '10"' },
+                // 👇 改成你给的可播 URL
+                { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
             ],
         },
         {
@@ -78,9 +81,10 @@ export default function NoteListScreen() {
             updatedAt: '2025/08/11 10:24',
             content: [
                 { type: 'text', value: 'This note has multiple images and audio.' },
-                { type: 'image', url: require('@/assets/images/icon.png') },
-                { type: 'image', url: 'https://images.pexels.com/photos/326055/pexels-photo-326055.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2' },
-                { type: 'audio', url: 'path/to/audio.mp3', duration: '25"' },
+                { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/04/24/01/29/trees-9554109_1280.jpg'},
+                { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/07/31/20/00/woman-9747618_1280.jpg' },
+                // 👇 同样用可播 URL
+                { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
             ],
         },
     ]);
