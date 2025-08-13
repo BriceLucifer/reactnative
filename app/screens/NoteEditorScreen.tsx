@@ -35,7 +35,7 @@ const FAKE_NOTES_DATABASE: Note[] = [
         content: [
             { type: 'text', value: 'It is not enough to just translate the language.' },
             // 👇 改成你给的可播 URL
-            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
+            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12', transcript: 'I drank a large glass of hot water today, which warmed my stomach and heart. I used to think that drinking hot water was perfunctory advice, but now I think it is basic care for myself.' },
         ],
     },
     {
@@ -46,7 +46,7 @@ const FAKE_NOTES_DATABASE: Note[] = [
             { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/04/24/01/29/trees-9554109_1280.jpg' },
             { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/07/31/20/00/woman-9747618_1280.jpg' },
             // 👇 同样用可播 URL
-            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
+            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12', transcript: 'This is a longer audio transcription that will demonstrate the show more functionality. I am still learning not to push myself too hard, even if it just starts with giving myself a glass of water. Self-care is not perfunctory advice but genuine care for oneself.' },
         ],
     },
 ];
@@ -70,11 +70,17 @@ function AudioCard({
     const [isPlaying, setIsPlaying] = useState(false);
     const [lenMs, setLenMs] = useState(0);
     const [posMs, setPosMs] = useState(0);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => () => { if (soundRef.current) soundRef.current.unloadAsync(); }, []);
 
     const ensureSound = async () => {
-        if (soundRef.current) return soundRef.current;
+        if (soundRef.current) {
+            const status = await soundRef.current.getStatusAsync() as AVPlaybackStatusSuccess;
+            if (status.isLoaded) return soundRef.current;
+            await soundRef.current.unloadAsync();
+        }
+        
         await Audio.setAudioModeAsync({
             allowsRecordingIOS: false,
             playsInSilentModeIOS: true,
@@ -83,6 +89,7 @@ function AudioCard({
             interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
             staysActiveInBackground: false,
         });
+        
         const { sound } = await Audio.Sound.createAsync(
             { uri: url },
             { shouldPlay: false, progressUpdateIntervalMillis: 200 },
@@ -92,7 +99,10 @@ function AudioCard({
                     setIsPlaying(s.isPlaying);
                     setPosMs(s.positionMillis);
                     if (s.durationMillis) setLenMs(s.durationMillis);
-                    if (s.didJustFinish) setIsPlaying(false);
+                    if (s.didJustFinish) {
+                        setIsPlaying(false);
+                        setPosMs(0);
+                    }
                 }
             }
         );
@@ -102,27 +112,47 @@ function AudioCard({
 
     const togglePlay = async () => {
         if (uploading) return;
-        const sound = await ensureSound();
-        const st = await sound.getStatusAsync() as AVPlaybackStatusSuccess;
-        if (!st.isLoaded) return;
-        if (st.isPlaying) await sound.pauseAsync(); else await sound.playAsync();
+        try {
+            const sound = await ensureSound();
+            const st = await sound.getStatusAsync() as AVPlaybackStatusSuccess;
+            if (!st.isLoaded) return;
+            
+            if (st.isPlaying) {
+                await sound.pauseAsync();
+            } else {
+                if (st.positionMillis === st.durationMillis) {
+                    await sound.setPositionAsync(0);
+                }
+                await sound.playAsync();
+            }
+        } catch (error) {
+            console.log('Audio playback error:', error);
+            setIsPlaying(false);
+        }
     };
 
     const progressPct = lenMs ? Math.min(1, posMs / lenMs) : 0;
 
+    const truncatedTranscript = transcript && transcript.length > 50 
+        ? transcript.substring(0, 50) + '...' 
+        : transcript;
+
     return (
         <View style={styles.audioContainer}>
             <View style={styles.audioTopRow}>
-                <TouchableOpacity onPress={togglePlay} disabled={!!uploading} style={styles.audioPlayBtn}>
+                <TouchableOpacity onPress={togglePlay} disabled={!!uploading} style={[styles.audioPlayBtn, isPlaying && styles.audioPlayBtnActive]}>
                     <Text style={styles.audioPlayIcon}>{isPlaying ? '⏸' : '▶'}</Text>
                 </TouchableOpacity>
                 <View style={styles.audioInfo}>
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
+                    <View style={styles.progressContainer}>
+                        <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
+                            <View style={[styles.progressThumb, { left: `${progressPct * 100}%` }]} />
+                        </View>
                     </View>
                     <View style={styles.timeRow}>
                         <Text style={styles.timeText}>{mmss(posMs)}</Text>
-                        <Text style={styles.timeText}>{duration}</Text>
+                        <Text style={styles.audioDurationText}>{duration}</Text>
                     </View>
                 </View>
                 {onDelete && (
@@ -132,20 +162,41 @@ function AudioCard({
                 )}
             </View>
 
-            <TextInput
-                style={styles.audioTranscript}
-                placeholder="Transcribed text… (editable)"
-                placeholderTextColor="#8E8E93"
-                multiline
-                value={transcript ?? ''}
-                onChangeText={onChangeTranscript}
-                editable={!uploading}
-            />
+            {/* 折叠展开的转录文本 */}
+            <View style={styles.transcriptContainer}>
+                <Text style={styles.audioTranscriptText}>
+                    {isExpanded ? transcript : truncatedTranscript}
+                </Text>
+                
+                {transcript && transcript.length > 50 && (
+                    <TouchableOpacity 
+                        onPress={() => setIsExpanded(!isExpanded)}
+                        style={styles.showMoreButton}
+                    >
+                        <Text style={styles.showMoreText}>
+                            {isExpanded ? 'show less' : 'show more'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+                
+                {/* 可编辑的转录文本 */}
+                {isExpanded && (
+                    <TextInput
+                        style={styles.audioTranscriptInput}
+                        placeholder="Edit transcription..."
+                        placeholderTextColor="#8E8E93"
+                        multiline
+                        value={transcript ?? ''}
+                        onChangeText={onChangeTranscript}
+                        editable={!uploading}
+                    />
+                )}
+            </View>
 
             {uploading && (
                 <View style={styles.uploadingMask}>
-                    <ActivityIndicator />
-                    <Text style={{ marginTop: 6, color: '#111' }}>Uploading…</Text>
+                    <ActivityIndicator color="#000" size="small" />
+                    <Text style={styles.uploadingText}>Uploading…</Text>
                 </View>
             )}
         </View>
@@ -373,6 +424,10 @@ export default function NoteEditorScreen() {
     };
 
     const handleDelete = (idx: number) => setContent(prev => prev.filter((_, i) => i !== idx));
+    
+    const handleAddText = () => {
+        setContent(prev => [...prev, { type: 'text', value: '' }]);
+    };
 
     const handleRecorded = (localUri: string, durationMs: number, transcript?: string) => {
         const blk: ContentBlock = { type: 'audio', url: localUri, duration: mmss(durationMs), transcript: transcript ?? '' };
@@ -381,6 +436,41 @@ export default function NoteEditorScreen() {
 
     const handleClose = () => router.back();
     const handleSave = () => Alert.alert('Saved', 'Note saved (demo).');
+    
+    const handleAIRespond = async () => {
+        setContent(prev => [...prev, { type: 'text', value: '', isAIGenerating: true }]);
+        
+        setTimeout(() => {
+            const contentText = content
+                .filter(block => block.type === 'text')
+                .map(block => (block as any).value)
+                .join(' ');
+            
+            const hasImages = content.some(block => block.type === 'image');
+            const hasAudio = content.some(block => block.type === 'audio');
+            
+            let aiResponse = '';
+            if (contentText.toLowerCase().includes('global')) {
+                aiResponse = 'Building a global product requires understanding cultural nuances, local regulations, and market preferences. Consider localization beyond language - currency, payment methods, and user behavior patterns vary significantly across regions.';
+            } else if (hasImages && hasAudio) {
+                aiResponse = 'I can see you have both visual and audio content. This multimodal approach creates rich, engaging experiences. Consider how these elements complement your text to tell a compelling story.';
+            } else if (hasImages) {
+                aiResponse = 'Visual content can be powerful for storytelling. The images you\'ve included add context and emotional depth to your message.';
+            } else if (hasAudio) {
+                aiResponse = 'Audio content adds a personal touch and can convey emotion and nuance that text alone cannot capture.';
+            } else if (contentText) {
+                aiResponse = 'I understand your thoughts. Let me help expand on this idea with some additional insights and perspectives that might be useful.';
+            } else {
+                aiResponse = 'I\'m ready to help! Share your thoughts, images, or audio, and I\'ll provide relevant insights and suggestions.';
+            }
+            
+            setContent(prev => prev.map((block, index) => 
+                index === prev.length - 1 && (block as any).isAIGenerating
+                    ? { type: 'text', value: aiResponse, isAI: true }
+                    : block
+            ));
+        }, 1500);
+    };
 
     if (isLoading) return <View style={styles.container}><Text>Loading...</Text></View>;
 
@@ -401,8 +491,34 @@ export default function NoteEditorScreen() {
                             case 'prompt':
                                 return <Text key={`p-${index}`} style={styles.promptText}>{(block as any).value}</Text>;
                             case 'text':
+                                const isAIGenerating = (block as any).isAIGenerating;
+                                const isAI = (block as any).isAI;
+                                
+                                if (isAIGenerating) {
+                                    return (
+                                        <View key={`t-${index}`} style={[styles.textBlockContainer, styles.aiGeneratingContainer]}>
+                                            <View style={styles.aiGeneratingContent}>
+                                                <ActivityIndicator size="small" color="#666" />
+                                                <Text style={styles.aiGeneratingText}>AI is thinking...</Text>
+                                            </View>
+                                        </View>
+                                    );
+                                }
+                                
+                                if (isAI) {
+                                    return (
+                                        <View key={`t-${index}`} style={[styles.textBlockContainer, styles.aiResponseContainer]}>
+                                            <Text style={styles.aiLabel}>🤖 Shiro</Text>
+                                            <Text style={styles.aiResponseText}>{(block as any).value}</Text>
+                                            <TouchableOpacity onPress={() => handleDelete(index)} style={styles.blockDeleteBtn}>
+                                                <Text style={styles.blockDeleteX}>✕</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    );
+                                }
+                                
                                 return (
-                                    <View key={`t-${index}`} style={{ marginBottom: 16 }}>
+                                    <View key={`t-${index}`} style={styles.textBlockContainer}>
                                         <TextInput
                                             style={styles.textInput}
                                             placeholder="Write something..."
@@ -410,10 +526,13 @@ export default function NoteEditorScreen() {
                                             multiline
                                             value={(block as any).value}
                                             onChangeText={(t) => handleTextChange(t, index)}
+                                            textAlignVertical="top"
                                         />
-                                        <TouchableOpacity onPress={() => handleDelete(index)} style={styles.blockDeleteBtn}>
-                                            <Text style={styles.blockDeleteX}>✕</Text>
-                                        </TouchableOpacity>
+                                        {((block as any).value?.length > 0 || content.filter(b => b.type === 'text').length > 1) && (
+                                            <TouchableOpacity onPress={() => handleDelete(index)} style={styles.blockDeleteBtn}>
+                                                <Text style={styles.blockDeleteX}>✕</Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                 );
                             case 'image':
@@ -454,7 +573,10 @@ export default function NoteEditorScreen() {
                     <TouchableOpacity onPress={() => setShowRecorder(true)}>
                         <Image source={require('../../assets/images/record.png')} style={styles.toolbarIcon} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.respondButton} onPress={handleSave}>
+                    <TouchableOpacity onPress={handleAddText} style={styles.toolbarTextBtn}>
+                        <Text style={styles.toolbarTextIcon}>Aa</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.respondButton} onPress={handleAIRespond}>
                         <Text style={styles.respondButtonText}>Respond</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleAddImage}>
@@ -482,28 +604,125 @@ const styles = StyleSheet.create({
     contentContainer: { paddingHorizontal: 24, paddingBottom: 24 },
     timestamp: { fontSize: 13, color: '#AEAEB2', marginBottom: 24 },
     promptText: { fontSize: 22, lineHeight: 32, color: '#020F20', marginBottom: 24, fontWeight: '600' },
+    textBlockContainer: { marginBottom: 16, position: 'relative' },
     textInput: { fontSize: 18, lineHeight: 28, color: '#020F20', minHeight: 100, backgroundColor: '#FAFAFC', borderRadius: 12, padding: 12 },
     image: { width: '100%', aspectRatio: 16 / 9, borderRadius: 16 },
 
     toolbar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, paddingBottom: Platform.OS === 'ios' ? 24 : 16, borderTopWidth: 1, borderTopColor: '#F2F2F7' },
     toolbarIcon: { width: 28, height: 28, resizeMode: 'contain' },
+    toolbarTextBtn: { 
+        width: 32, 
+        height: 32, 
+        borderRadius: 16, 
+        backgroundColor: '#F2F2F7', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+    },
+    toolbarTextIcon: { 
+        color: '#333', 
+        fontSize: 14, 
+        fontWeight: '600' 
+    },
     respondButton: { backgroundColor: '#333231', borderRadius: 99, paddingVertical: 16, paddingHorizontal: 40 },
     respondButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 
-    // Audio card（黑色风）
+    // Audio card（升级样式）
     audioContainer: {
-        backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 16, padding: 12, marginVertical: 16,
-        borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', overflow: 'hidden'
+        backgroundColor: '#FAFAFC', 
+        borderRadius: 20, 
+        padding: 16, 
+        marginVertical: 16,
+        borderWidth: 1, 
+        borderColor: '#F0F0F3', 
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
     },
     audioTopRow: { flexDirection: 'row', alignItems: 'center' },
-    audioPlayBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-    audioPlayIcon: { color: '#fff', fontSize: 16, fontWeight: '600' },
+    audioPlayBtn: { 
+        width: 44, 
+        height: 44, 
+        borderRadius: 22, 
+        backgroundColor: '#000', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        marginRight: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    audioPlayBtnActive: {
+        backgroundColor: '#333',
+        transform: [{ scale: 0.95 }],
+    },
+    audioPlayIcon: { color: '#fff', fontSize: 16, fontWeight: '700' },
     audioInfo: { flex: 1 },
-    progressTrack: { height: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.12)', overflow: 'hidden' },
-    progressFill: { height: '100%', backgroundColor: '#000' },
-    timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-    timeText: { color: '#222', fontSize: 12, fontVariant: ['tabular-nums'] },
-    audioTranscript: { marginTop: 10, backgroundColor: '#fff', borderRadius: 12, padding: 10, fontSize: 16, lineHeight: 24, color: '#020F20' },
+    progressContainer: { marginBottom: 8 },
+    progressTrack: { 
+        height: 6, 
+        borderRadius: 6, 
+        backgroundColor: '#E5E5EA', 
+        overflow: 'hidden',
+        position: 'relative'
+    },
+    progressFill: { 
+        height: '100%', 
+        backgroundColor: '#000',
+        borderRadius: 6,
+    },
+    progressThumb: {
+        position: 'absolute',
+        top: -3,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#000',
+        marginLeft: -6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    timeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    timeText: { color: '#333', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+    audioDurationText: { color: '#666', fontSize: 12, fontVariant: ['tabular-nums'] },
+    transcriptContainer: {
+        marginTop: 12,
+    },
+    audioTranscriptText: {
+        fontSize: 15,
+        lineHeight: 22,
+        color: '#020F20',
+        marginBottom: 4,
+    },
+    showMoreButton: {
+        alignSelf: 'flex-start',
+        marginTop: 4,
+        marginBottom: 8,
+    },
+    showMoreText: {
+        fontSize: 14,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    audioTranscriptInput: { 
+        backgroundColor: '#fff', 
+        borderRadius: 12, 
+        padding: 12, 
+        fontSize: 15, 
+        lineHeight: 22, 
+        color: '#020F20',
+        borderWidth: 1,
+        borderColor: '#F0F0F3',
+        marginTop: 8,
+        minHeight: 80,
+    },
 
     // 删除按钮
     blockDeleteBtn: { position: 'absolute', top: -10, right: -10, backgroundColor: 'rgba(0,0,0,0.08)', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -520,5 +739,47 @@ const styles = StyleSheet.create({
     modalBtnText: { color: '#fff', fontWeight: '600' },
     modalBtnTextDark: { color: '#111', fontWeight: '600' },
 
-    uploadingMask: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.65)', alignItems: 'center', justifyContent: 'center' },
+    uploadingMask: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+    uploadingText: { marginTop: 8, color: '#333', fontSize: 14, fontWeight: '500' },
+    
+    // AI 相关样式
+    aiGeneratingContainer: { 
+        backgroundColor: '#F0F8FF', 
+        borderRadius: 16, 
+        padding: 16, 
+        borderWidth: 1, 
+        borderColor: '#E0E7FF' 
+    },
+    aiGeneratingContent: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        minHeight: 60 
+    },
+    aiGeneratingText: { 
+        marginLeft: 12, 
+        color: '#666', 
+        fontSize: 15, 
+        fontStyle: 'italic' 
+    },
+    aiResponseContainer: { 
+        backgroundColor: '#F8F9FF', 
+        borderRadius: 16, 
+        padding: 16, 
+        borderWidth: 1, 
+        borderColor: '#E8E9FF',
+        borderLeftWidth: 4,
+        borderLeftColor: '#4F46E5',
+    },
+    aiLabel: { 
+        fontSize: 13, 
+        fontWeight: '600', 
+        color: '#4F46E5', 
+        marginBottom: 8 
+    },
+    aiResponseText: { 
+        fontSize: 16, 
+        lineHeight: 24, 
+        color: '#374151' 
+    },
 });

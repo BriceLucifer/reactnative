@@ -1,23 +1,75 @@
 // 登陆界面
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { signInWithApple, signInWithGoogle } from "@/services/appwrite";
-import {router} from "expo-router";
+import React, { useState, useEffect } from 'react';
+import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
+import { router } from "expo-router";
+import { signInWithApple, signInWithGoogle, testConnection } from '../services/appwrite';
+import { Fonts, FontStyles } from '../constants/Fonts';
 
 export default function Index() {
+    const [isAppleLoading, setIsAppleLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+    useEffect(() => {
+        // Test connection when component mounts
+        testConnection();
+    }, []);
+
     const handleAppleLogin = async () => {
-        // try { await signInWithApple(); } catch (e) { console.warn('Apple OAuth', e); }
-        router.push("/screens/Permission");
+        if (isAppleLoading) return;
+        
+        setIsAppleLoading(true);
+        try {
+            const result = await signInWithApple();
+            
+            if (result.success) {
+                // 登录成功，跳转到权限页面
+                Alert.alert('登录成功', `欢迎，${result.user.email}!`, [
+                    { text: '继续', onPress: () => router.push('/screens/Permission') }
+                ]);
+            } else {
+                // 登录失败或取消
+                if (result.error !== 'Login cancelled or failed') {
+                    Alert.alert('登录失败', result.error || '请稍后重试');
+                }
+            }
+        } catch (e) {
+            console.error('Apple login error:', e);
+            Alert.alert('登录失败', '登录过程中发生错误，请稍后重试');
+        } finally {
+            setIsAppleLoading(false);
+        }
     };
+
     const handleGoogleLogin = async () => {
-        // try { await signInWithGoogle(); } catch (e) { console.warn('Google OAuth', e); }
-        router.push("/screens/Permission");
+        if (isGoogleLoading) return;
+        
+        setIsGoogleLoading(true);
+        try {
+            const result = await signInWithGoogle();
+            
+            if (result.success) {
+                // 登录成功，跳转到权限页面
+                Alert.alert('登录成功', `欢迎，${result.user.email}!`, [
+                    { text: '继续', onPress: () => router.push('/screens/Permission') }
+                ]);
+            } else {
+                // 登录失败或取消
+                if (result.error !== 'Login cancelled or failed') {
+                    Alert.alert('登录失败', result.error || '请稍后重试');
+                }
+            }
+        } catch (e) {
+            console.error('Google login error:', e);
+            Alert.alert('登录失败', '登录过程中发生错误，请稍后重试');
+        } finally {
+            setIsGoogleLoading(false);
+        }
     };
 
     return (
-      <ImageBackground 
-        source={require('../assets/images/background.png')} 
+      <ImageBackground
+        source={require('../assets/images/background.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -36,28 +88,44 @@ export default function Index() {
           {/* 登录按钮区域 */}
           <View style={styles.buttonContainer}>
             {/* Apple 登录按钮 - 使用渐变 */}
-            <TouchableOpacity onPress={handleAppleLogin}>
+            <TouchableOpacity onPress={() => router.push("/screens/Permission")} disabled={isAppleLoading || isGoogleLoading}>
               <LinearGradient
                 colors={['#4A4849', '#292927']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
-                style={styles.appleButton}
+                style={[styles.appleButton, (isAppleLoading || isGoogleLoading) && styles.disabledButton]}
               >
-                <Image 
-                  source={require('../assets/images/apple.png')} 
-                  style={styles.buttonIcon}
-                />
-                <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                {isAppleLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Image
+                    source={require('../assets/images/apple.png')}
+                    style={styles.buttonIcon}
+                  />
+                )}
+                <Text style={styles.appleButtonText}>
+                  {isAppleLoading ? 'Loading...' : 'Continue with Apple'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 
             {/* Google 登录按钮 */}
-            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-              <Image 
-                source={require('../assets/images/google.png')} 
-                style={styles.buttonIcon}
-              />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            <TouchableOpacity 
+              style={[styles.googleButton, (isAppleLoading || isGoogleLoading) && styles.disabledButton]} 
+              onPress={()=> router.push("/screens/Permission")}
+              disabled={isAppleLoading || isGoogleLoading}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator size="small" color="#020F20" />
+              ) : (
+                <Image
+                  source={require('../assets/images/google.png')}
+                  style={styles.buttonIcon}
+                />
+              )}
+              <Text style={styles.googleButtonText}>
+                {isGoogleLoading ? 'Loading...' : 'Continue with Google'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -83,13 +151,11 @@ const styles = StyleSheet.create({
     marginTop: 60, // 增加顶部边距，让标题往下移动
   },
   headerTypography: {
-    fontSize: 32,              
-    lineHeight: 48,          
-    letterSpacing: -0.5,          
-    textAlign: 'center',       
+    ...FontStyles.title,
+    letterSpacing: -0.5,
+    textAlign: 'center',
     color: '#020F20',
     maxWidth: 400,
-    fontWeight: 'bold', // 使用系统字体的粗体
   },
   decorationContainer: {
     flex: 1,
@@ -133,13 +199,14 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   appleButtonText: {
+    ...FontStyles.buttonLarge,
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
   },
   googleButtonText: {
+    ...FontStyles.buttonLarge,
     color: '#020F20',
-    fontSize: 18,
-    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });
