@@ -1,16 +1,18 @@
 // 登陆界面
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import React from 'react';
 import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { signInWithApple, signInWithGoogle } from "@/services/appwrite";
+import {router} from "expo-router";
 
 export default function Index() {
-    const handleAppleLogin = () => {
-        router.push('/screens/Permission');
+    const handleAppleLogin = async () => {
+        // try { await signInWithApple(); } catch (e) { console.warn('Apple OAuth', e); }
+        router.push("/screens/Permission");
     };
-
-    const handleGoogleLogin = () => {
-        router.push('/screens/Permission');
+    const handleGoogleLogin = async () => {
+        // try { await signInWithGoogle(); } catch (e) { console.warn('Google OAuth', e); }
+        router.push("/screens/Permission");
     };
 
     return (
