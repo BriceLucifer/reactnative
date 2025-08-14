@@ -63,7 +63,12 @@
         }
       ],
       "expo-notifications",
-      "expo-calendar",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Shiro 需要访问您的日历，以便为您建议合适的反思时刻。"
+        }
+      ],
       "expo-location",
       [
         "expo-av",

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
 import { router } from "expo-router";
 import { signInWithApple, signInWithGoogle, testConnection } from '../services/appwrite';
-import { Fonts, FontStyles } from '../constants/Fonts';
+import { FontStyles } from '../constants/Fonts';
 
 export default function Index() {
     const [isAppleLoading, setIsAppleLoading] = useState(false);
@@ -67,6 +67,10 @@ export default function Index() {
         }
     };
 
+    const handlepermission = async () => {
+        router.push('/screens/Permission');
+    }
+
     return (
       <ImageBackground
         source={require('../assets/images/background.png')}
@@ -88,7 +92,7 @@ export default function Index() {
           {/* 登录按钮区域 */}
           <View style={styles.buttonContainer}>
             {/* Apple 登录按钮 - 使用渐变 */}
-            <TouchableOpacity onPress={() => router.push("/screens/Permission")} disabled={isAppleLoading || isGoogleLoading}>
+            <TouchableOpacity onPress={ handlepermission } disabled={isAppleLoading || isGoogleLoading}>
               <LinearGradient
                 colors={['#4A4849', '#292927']}
                 start={{ x: 0, y: 0 }}
@@ -112,7 +116,7 @@ export default function Index() {
             {/* Google 登录按钮 */}
             <TouchableOpacity 
               style={[styles.googleButton, (isAppleLoading || isGoogleLoading) && styles.disabledButton]} 
-              onPress={()=> router.push("/screens/Permission")}
+              onPress={ handlepermission }
               disabled={isAppleLoading || isGoogleLoading}
             >
               {isGoogleLoading ? (

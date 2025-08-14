@@ -1,6 +1,6 @@
 import ProfileDrawer from '@/components/ProfileDrawer';
 import ChatDialog from '@/components/ChatDialog';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
     FlatList,
     Image,
@@ -10,11 +10,16 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert,
+    RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import NoteCard, { Note } from '@/components/NoteCard';
+import NoteCard from '@/components/NoteCard';
+import { Note } from '@/types';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Reanimated
 import Animated, {
@@ -35,15 +40,26 @@ const LIST_TOP_PADDING = HEADER_TOP_OFFSET + 10; // 列表为浮动头部让出�
 // 动画范围：向下滚动多少像素时完成缩小/渐隐
 const COLLAPSE_RANGE = 80;
 
-// ✅ 你的 Appwrite 本地音频 URL（可直接播）
-const LOCAL_ADMIN_AUDIO_URL =
-    'http://localhost/v1/storage/buckets/689b2283000a1eb4930c/files/689b2294000e0c2dfbbc/view?project=688a534b000dacc7f1c8&mode=admin';
+// Environment configuration
+const API_CONFIG = {
+    baseURL: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://api.freedomai.fun/v1',
+    projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '689c404400138a4a5f2d',
+};
+
+// Default audio URL for demo
+const DEFAULT_AUDIO_URL = `${API_CONFIG.baseURL}/storage/buckets/689b2283000a1eb4930c/files/689b2294000e0c2dfbbc/view?project=${API_CONFIG.projectId}&mode=admin`;
 
 export default function NoteListScreen() {
     const [isDrawerVisible, setDrawerVisible] = useState(false);
     const [showChatDialog, setShowChatDialog] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const [notes, setNotes] = useState<Note[]>([
+    const [notes, setNotes] = useState<Note[]>([]);
+
+    // Initial demo data
+    const initialNotes: Note[] = useMemo(() => [
         {
             id: '1',
             updatedAt: '2025/08/11 10:24',
@@ -57,8 +73,7 @@ export default function NoteListScreen() {
             updatedAt: '2025/06/16 12:24',
             content: [
                 { type: 'text', value: 'It is not enough to just translate the language.' },
-                // 👇 改成你给的可播 URL
-                { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
+                { type: 'audio', url: DEFAULT_AUDIO_URL, duration: '00:12' },
             ],
         },
         {
@@ -83,20 +98,113 @@ export default function NoteListScreen() {
                 { type: 'text', value: 'This note has multiple images and audio.' },
                 { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/04/24/01/29/trees-9554109_1280.jpg'},
                 { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/07/31/20/00/woman-9747618_1280.jpg' },
-                // 👇 同样用可播 URL
-                { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12' },
+                { type: 'audio', url: DEFAULT_AUDIO_URL, duration: '00:12' },
             ],
         },
-    ]);
+    ], []);
+
+    // Load notes data
+    const loadNotes = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            // TODO: Replace with actual API call
+            // const response = await noteService.getNotes();
+            // setNotes(response.data);
+            
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            setNotes(initialNotes);
+        } catch (err) {
+            console.error('Failed to load notes:', err);
+            setError('Failed to load notes. Please try again.');
+            Alert.alert('Error', 'Failed to load notes. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [initialNotes]);
+
+    const refreshNotes = useCallback(async () => {
+        try {
+            setIsRefreshing(true);
+            setError(null);
+            // TODO: Replace with actual API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            setNotes(initialNotes);
+        } catch (err) {
+            console.error('Failed to refresh notes:', err);
+            setError('Failed to refresh notes.');
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [initialNotes]);
+
+    // Load data on mount and when screen comes into focus
+    useEffect(() => {
+        loadNotes();
+    }, [loadNotes]);
+
+    useFocusEffect(
+        useCallback(() => {
+            // Refresh notes when screen comes into focus
+            if (notes.length > 0) {
+                refreshNotes();
+            }
+        }, [refreshNotes, notes.length])
+    );
 
     // --- Handlers ---
-    const handleDeleteNote = (noteIdToDelete: string) => {
-        setNotes((currentNotes) => currentNotes.filter((note) => note.id !== noteIdToDelete));
-    };
-    const handleAddNote = () => { router.push('/screens/NoteEditorScreen'); };
-    const handleNotePress = (noteId: string) => { router.push(`/screens/NoteEditorScreen?noteId=${noteId}`); };
-    const handleAIChat = () => { setShowChatDialog(true); };
-    const handleProfile = () => { setDrawerVisible(true); };
+    const handleDeleteNote = useCallback(async (noteIdToDelete: string) => {
+        try {
+            // TODO: Add confirmation dialog
+            Alert.alert(
+                'Delete Note',
+                'Are you sure you want to delete this note?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                // TODO: Replace with actual API call
+                                // await noteService.deleteNote(noteIdToDelete);
+                                setNotes((currentNotes) => currentNotes.filter((note) => note.id !== noteIdToDelete));
+                            } catch (err) {
+                                console.error('Failed to delete note:', err);
+                                Alert.alert('Error', 'Failed to delete note. Please try again.');
+                            }
+                        }
+                    }
+                ]
+            );
+        } catch (err) {
+            console.error('Delete note error:', err);
+        }
+    }, []);
+    const handleAddNote = useCallback(() => {
+        try {
+            router.push('/screens/NoteEditorScreen');
+        } catch (err) {
+            console.error('Navigation error:', err);
+        }
+    }, []);
+
+    const handleNotePress = useCallback((noteId: string) => {
+        try {
+            router.push(`/screens/NoteEditorScreen?noteId=${noteId}`);
+        } catch (err) {
+            console.error('Navigation error:', err);
+        }
+    }, []);
+
+    const handleAIChat = useCallback(() => {
+        setShowChatDialog(true);
+    }, []);
+
+    const handleProfile = useCallback(() => {
+        setDrawerVisible(true);
+    }, []);
 
     // --- Scroll-driven animation ---
     const scrollY = useSharedValue(0);
@@ -189,12 +297,32 @@ export default function NoteListScreen() {
                 </View>
             </Animated.View>
 
-            {notes.length === 0 ? (
+            {isLoading ? (
+                // --- Loading State ---
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#020F20" />
+                    <Text style={styles.loadingText}>Loading your notes...</Text>
+                </View>
+            ) : error ? (
+                // --- Error State ---
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorTitle}>Something went wrong</Text>
+                    <Text style={styles.errorSubtitle}>{error}</Text>
+                    <TouchableOpacity style={styles.retryButton} onPress={loadNotes}>
+                        <Text style={styles.retryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : notes.length === 0 ? (
                 // --- Empty State ---
                 <View style={styles.emptyStateContainer}>
                     <Text style={styles.emptyStateTitle}>You haven&apos;t added anything yet</Text>
                     <Text style={styles.emptyStateSubtitle}>Click on the plus, to add notes</Text>
-                    <TouchableOpacity style={styles.addButton} onPress={handleAddNote}>
+                    <TouchableOpacity 
+                        style={styles.addButton} 
+                        onPress={handleAddNote}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add new note"
+                    >
                         <LinearGradient
                             colors={['#4A4849', '#292927']}
                             start={{ x: 0.5, y: 0 }}
@@ -224,15 +352,34 @@ export default function NoteListScreen() {
                         contentContainerStyle={[styles.listContentContainer, { paddingTop: LIST_TOP_PADDING }]}
                         scrollIndicatorInsets={{ top: LIST_TOP_PADDING, bottom: 0 }}
                         style={{ backgroundColor: '#F8F9FA' }}
-                        // 性能优化
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isRefreshing}
+                                onRefresh={refreshNotes}
+                                tintColor="#020F20"
+                                colors={['#020F20']}
+                                progressViewOffset={LIST_TOP_PADDING}
+                            />
+                        }
+                        // Performance optimizations
                         removeClippedSubviews
-                        initialNumToRender={8}
-                        maxToRenderPerBatch={8}
-                        windowSize={7}
+                        initialNumToRender={10}
+                        maxToRenderPerBatch={10}
+                        windowSize={10}
+                        getItemLayout={(_, index) => ({
+                            length: 200, // Approximate item height
+                            offset: 200 * index,
+                            index,
+                        })}
                     />
                     <View style={styles.bottomBarContainer}>
                         <BlurView intensity={6} tint="extraLight" style={StyleSheet.absoluteFill} />
-                        <TouchableOpacity style={styles.fab} onPress={handleAddNote}>
+                        <TouchableOpacity 
+                            style={styles.fab} 
+                            onPress={handleAddNote}
+                            accessibilityRole="button"
+                            accessibilityLabel="Add new note"
+                        >
                             <LinearGradient
                                 colors={['#4A4849', '#292927']}
                                 start={{ x: 0.5, y: 0 }}
@@ -319,7 +466,56 @@ const styles = StyleSheet.create({
     iconImage: { width: 24, height: 24, resizeMode: 'contain' },
 
     // 列表容器：paddingTop 由动态样式注入
-    listContentContainer: { paddingHorizontal: 20, paddingBottom: 50 },
+    listContentContainer: { paddingHorizontal: 20, paddingBottom: 100 },
+
+    // --- Loading State ---
+    loadingContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        paddingHorizontal: 40 
+    },
+    loadingText: { 
+        marginTop: 16, 
+        color: '#8E8E93', 
+        fontSize: 16, 
+        fontFamily: 'Gilroy-Regular' 
+    },
+
+    // --- Error State ---
+    errorContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        paddingHorizontal: 40 
+    },
+    errorTitle: { 
+        color: '#FF3B30', 
+        fontSize: 20, 
+        fontWeight: '600', 
+        textAlign: 'center', 
+        marginBottom: 8, 
+        fontFamily: 'Gilroy-SemiBold' 
+    },
+    errorSubtitle: { 
+        color: '#8E8E93', 
+        fontSize: 16, 
+        textAlign: 'center', 
+        marginBottom: 24, 
+        fontFamily: 'Gilroy-Regular' 
+    },
+    retryButton: { 
+        backgroundColor: '#020F20', 
+        paddingHorizontal: 24, 
+        paddingVertical: 12, 
+        borderRadius: 12 
+    },
+    retryButtonText: { 
+        color: '#FFFFFF', 
+        fontSize: 16, 
+        fontWeight: '600', 
+        fontFamily: 'Gilroy-SemiBold' 
+    },
 
     // --- Empty State Styles ---
     emptyStateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, marginTop: -60 },

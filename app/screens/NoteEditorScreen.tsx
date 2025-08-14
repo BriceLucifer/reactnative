@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-    Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Animated, ActivityIndicator
+    Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal, Animated, ActivityIndicator,
+    StatusBar
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, AVPlaybackStatusSuccess, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- Types ---
 export type ContentBlock =
@@ -13,13 +15,35 @@ export type ContentBlock =
     | { type: 'image'; url: string }
     | { type: 'audio'; url: string; duration: string; transcript?: string; uploading?: boolean };
 export interface Note { id: string; updatedAt: string; content: ContentBlock[]; }
-type EditorContentBlock = ContentBlock | { type: 'prompt'; value: string };
+type EditorContentBlock = ContentBlock | { type: 'prompt'; value: string } | { type: 'text'; value: string; isAIGenerating?: boolean; isAI?: boolean };
 
-// ✅ 你的 Appwrite 本地音频 URL
-const LOCAL_ADMIN_AUDIO_URL =
-    'http://localhost/v1/storage/buckets/689b2283000a1eb4930c/files/689b2294000e0c2dfbbc/view?project=688a534b000dacc7f1c8&mode=admin';
+interface AudioCardProps {
+    url: string;
+    duration: string;
+    transcript?: string;
+    uploading?: boolean;
+    onChangeTranscript?: (t: string) => void;
+    onDelete?: () => void;
+}
 
-// --- Fake DB（仅当前屏用来演示） ---
+interface RecordingModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onRecorded: (uri: string, durationMs: number, transcript?: string) => void;
+}
+
+// const { width: SCREEN_WIDTH } = Dimensions.get('window'); // Unused for now
+
+// Environment configuration
+const API_CONFIG = {
+    baseURL: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://api.freedomai.fun/v1',
+    projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '689c404400138a4a5f2d',
+};
+
+// Default audio URL for demo
+const DEFAULT_AUDIO_URL = `${API_CONFIG.baseURL}/storage/buckets/689b2283000a1eb4930c/files/689b2294000e0c2dfbbc/view?project=${API_CONFIG.projectId}&mode=admin`;
+
+// --- Mock Database (for demo purposes only) ---
 const FAKE_NOTES_DATABASE: Note[] = [
     {
         id: '1',
@@ -34,8 +58,7 @@ const FAKE_NOTES_DATABASE: Note[] = [
         updatedAt: '2025/06/16 12:24',
         content: [
             { type: 'text', value: 'It is not enough to just translate the language.' },
-            // 👇 改成你给的可播 URL
-            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12', transcript: 'I drank a large glass of hot water today, which warmed my stomach and heart. I used to think that drinking hot water was perfunctory advice, but now I think it is basic care for myself.' },
+            { type: 'audio', url: DEFAULT_AUDIO_URL, duration: '00:12', transcript: 'I drank a large glass of hot water today, which warmed my stomach and heart. I used to think that drinking hot water was perfunctory advice, but now I think it is basic care for myself.' },
         ],
     },
     {
@@ -45,8 +68,7 @@ const FAKE_NOTES_DATABASE: Note[] = [
             { type: 'text', value: 'This note has multiple images and audio.' },
             { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/04/24/01/29/trees-9554109_1280.jpg' },
             { type: 'image', url: 'https://cdn.pixabay.com/photo/2025/07/31/20/00/woman-9747618_1280.jpg' },
-            // 👇 同样用可播 URL
-            { type: 'audio', url: LOCAL_ADMIN_AUDIO_URL, duration: '00:12', transcript: 'This is a longer audio transcription that will demonstrate the show more functionality. I am still learning not to push myself too hard, even if it just starts with giving myself a glass of water. Self-care is not perfunctory advice but genuine care for oneself.' },
+            { type: 'audio', url: DEFAULT_AUDIO_URL, duration: '00:12', transcript: 'This is a longer audio transcription that will demonstrate the show more functionality. I am still learning not to push myself too hard, even if it just starts with giving myself a glass of water. Self-care is not perfunctory advice but genuine care for oneself.' },
         ],
     },
 ];
@@ -60,11 +82,8 @@ const mmss = (ms: number) => {
 };
 
 // --- Audio preview card ---
-function AudioCard({
-                       url, duration, transcript, uploading, onChangeTranscript, onDelete,
-                   }: {
-    url: string; duration: string; transcript?: string; uploading?: boolean;
-    onChangeTranscript?: (t: string) => void; onDelete?: () => void;
+const AudioCard = React.memo<AudioCardProps>(function AudioCard({
+    url, duration, transcript, uploading, onChangeTranscript, onDelete,
 }) {
     const soundRef = useRef<Audio.Sound | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -74,43 +93,48 @@ function AudioCard({
 
     useEffect(() => () => { if (soundRef.current) soundRef.current.unloadAsync(); }, []);
 
-    const ensureSound = async () => {
-        if (soundRef.current) {
-            const status = await soundRef.current.getStatusAsync() as AVPlaybackStatusSuccess;
-            if (status.isLoaded) return soundRef.current;
-            await soundRef.current.unloadAsync();
-        }
-        
-        await Audio.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            playsInSilentModeIOS: true,
-            interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-            shouldDuckAndroid: true,
-            interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-            staysActiveInBackground: false,
-        });
-        
-        const { sound } = await Audio.Sound.createAsync(
-            { uri: url },
-            { shouldPlay: false, progressUpdateIntervalMillis: 200 },
-            (st) => {
-                const s = st as AVPlaybackStatusSuccess;
-                if (s.isLoaded) {
-                    setIsPlaying(s.isPlaying);
-                    setPosMs(s.positionMillis);
-                    if (s.durationMillis) setLenMs(s.durationMillis);
-                    if (s.didJustFinish) {
-                        setIsPlaying(false);
-                        setPosMs(0);
+    const ensureSound = useCallback(async () => {
+        try {
+            if (soundRef.current) {
+                const status = await soundRef.current.getStatusAsync() as AVPlaybackStatusSuccess;
+                if (status.isLoaded) return soundRef.current;
+                await soundRef.current.unloadAsync();
+            }
+            
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+                playsInSilentModeIOS: true,
+                interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+                shouldDuckAndroid: true,
+                interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+                staysActiveInBackground: false,
+            });
+            
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: url },
+                { shouldPlay: false, progressUpdateIntervalMillis: 200 },
+                (st) => {
+                    const s = st as AVPlaybackStatusSuccess;
+                    if (s.isLoaded) {
+                        setIsPlaying(s.isPlaying);
+                        setPosMs(s.positionMillis || 0);
+                        if (s.durationMillis) setLenMs(s.durationMillis);
+                        if (s.didJustFinish) {
+                            setIsPlaying(false);
+                            setPosMs(0);
+                        }
                     }
                 }
-            }
-        );
-        soundRef.current = sound;
-        return sound;
-    };
+            );
+            soundRef.current = sound;
+            return sound;
+        } catch (error) {
+            console.error('Audio setup error:', error);
+            throw error;
+        }
+    }, [url]);
 
-    const togglePlay = async () => {
+    const togglePlay = useCallback(async () => {
         if (uploading) return;
         try {
             const sound = await ensureSound();
@@ -126,10 +150,11 @@ function AudioCard({
                 await sound.playAsync();
             }
         } catch (error) {
-            console.log('Audio playback error:', error);
+            console.error('Audio playback error:', error);
             setIsPlaying(false);
+            Alert.alert('Playback Error', 'Unable to play audio. Please try again.');
         }
-    };
+    }, [uploading, ensureSound]);
 
     const progressPct = lenMs ? Math.min(1, posMs / lenMs) : 0;
 
@@ -201,14 +226,11 @@ function AudioCard({
             )}
         </View>
     );
-}
+});
 
-// --- Recording Modal（保留，黑色多层波纹，可先不点）---
-function RecordingModal({
-                            visible, onClose, onRecorded,
-                        }: {
-    visible: boolean; onClose: () => void;
-    onRecorded: (uri: string, durationMs: number, transcript?: string) => void;
+// --- Recording Modal ---
+const RecordingModal = React.memo<RecordingModalProps>(function RecordingModal({
+    visible, onClose, onRecorded,
 }) {
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
     const [durMs, setDurMs] = useState(0);
@@ -240,15 +262,23 @@ function RecordingModal({
         );
         breathingAnim.current.start();
     };
-    const stopBreathing = () => { if (breathingAnim.current) breathingAnim.current.stop(); coreScale.setValue(1); };
+    const stopBreathing = useCallback(() => { 
+        if (breathingAnim.current) breathingAnim.current.stop(); 
+        coreScale.setValue(1); 
+    }, [coreScale]);
 
     useEffect(() => {
         mountedRef.current = visible;
         if (!visible) return;
 
         (async () => {
-            const perm = await Audio.requestPermissionsAsync();
-            if (perm.status !== 'granted') { Alert.alert('Permission Required', 'Microphone access is required.'); onClose(); return; }
+            try {
+                const perm = await Audio.requestPermissionsAsync();
+                if (perm.status !== 'granted') { 
+                    Alert.alert('Permission Required', 'Microphone access is required to record audio.'); 
+                    onClose(); 
+                    return; 
+                }
 
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: true,
@@ -259,13 +289,13 @@ function RecordingModal({
                 staysActiveInBackground: false,
             });
 
-            const { recording } = await Audio.Recording.createAsync({
-                ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-                // @ts-ignore
-                android: { ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android, isMeteringEnabled: true },
-                // @ts-ignore
-                ios: { ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios, meteringEnabled: true },
-            });
+                const { recording } = await Audio.Recording.createAsync({
+                    ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+                    // @ts-ignore
+                    android: { ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android, isMeteringEnabled: true },
+                    // @ts-ignore
+                    ios: { ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios, meteringEnabled: true },
+                });
             setRecording(recording);
 
             statusTimer.current = setInterval(async () => {
@@ -289,9 +319,14 @@ function RecordingModal({
                 } catch {}
             }, 140);
 
-            animateRipple(ripples[0], 0);
-            animateRipple(ripples[1], 300);
-            animateRipple(ripples[2], 600);
+                animateRipple(ripples[0], 0);
+                animateRipple(ripples[1], 300);
+                animateRipple(ripples[2], 600);
+            } catch (error) {
+                console.error('Recording initialization error:', error);
+                Alert.alert('Recording Error', 'Failed to initialize recording. Please try again.');
+                onClose();
+            }
         })();
 
         return () => {
@@ -302,27 +337,40 @@ function RecordingModal({
         };
     }, [visible]);
 
-    const stopAndSave = async () => {
-        if (statusTimer.current) clearInterval(statusTimer.current);
-        if (meterTimer.current) clearInterval(meterTimer.current);
-        stopBreathing();
-        if (!recording) return;
+    const stopAndSave = useCallback(async () => {
+        try {
+            if (statusTimer.current) clearInterval(statusTimer.current);
+            if (meterTimer.current) clearInterval(meterTimer.current);
+            stopBreathing();
+            if (!recording) return;
 
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI() ?? '';
-        const st = await recording.getStatusAsync();
-        const ms = (st as any).durationMillis ?? 0;
-        onRecorded(uri, ms, '');
-        onClose();
-    };
+            await recording.stopAndUnloadAsync();
+            const uri = recording.getURI() ?? '';
+            const st = await recording.getStatusAsync();
+            const ms = (st as any).durationMillis ?? 0;
+            
+            if (uri && ms > 0) {
+                onRecorded(uri, ms, '');
+            }
+            onClose();
+        } catch (error) {
+            console.error('Recording save error:', error);
+            Alert.alert('Save Error', 'Failed to save recording. Please try again.');
+        }
+    }, [recording, onRecorded, onClose, stopBreathing]);
 
-    const cancel = async () => {
-        if (statusTimer.current) clearInterval(statusTimer.current);
-        if (meterTimer.current) clearInterval(meterTimer.current);
-        stopBreathing();
-        if (recording) await recording.stopAndUnloadAsync().catch(() => {});
-        onClose();
-    };
+    const cancel = useCallback(async () => {
+        try {
+            if (statusTimer.current) clearInterval(statusTimer.current);
+            if (meterTimer.current) clearInterval(meterTimer.current);
+            stopBreathing();
+            if (recording) await recording.stopAndUnloadAsync().catch(() => {});
+            onClose();
+        } catch (error) {
+            console.error('Recording cancel error:', error);
+            onClose();
+        }
+    }, [recording, onClose, stopBreathing]);
 
     const Ripple = ({ v }: { v: Animated.Value }) => {
         const scale = v.interpolate({ inputRange: [0, 1], outputRange: [1, 2.6] });
@@ -381,69 +429,151 @@ function RecordingModal({
             </View>
         </Modal>
     );
-}
+});
 
 export default function NoteEditorScreen() {
     const { noteId } = useLocalSearchParams<{ noteId?: string }>();
     const [content, setContent] = useState<EditorContentBlock[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
     const [showRecorder, setShowRecorder] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
-        if (noteId) {
-            const existingNote = FAKE_NOTES_DATABASE.find(n => n.id === noteId);
-            if (existingNote) setContent(existingNote.content);
-        } else {
-            const now = new Date();
-            const greeting = `Good ${now.getHours() < 12 ? 'morning' : 'afternoon'}, Mike.`;
-            setContent([{ type: 'prompt', value: `${greeting}\nWhat's on your mind?` }, { type: 'text', value: '' }]);
-        }
-        setIsLoading(false);
+        const loadNote = async () => {
+            try {
+                setIsLoading(true);
+                if (noteId) {
+                    // TODO: Replace with actual API call
+                    const existingNote = FAKE_NOTES_DATABASE.find(n => n.id === noteId);
+                    if (existingNote) {
+                        setContent(existingNote.content);
+                    } else {
+                        Alert.alert('Error', 'Note not found');
+                        router.back();
+                    }
+                } else {
+                    const now = new Date();
+                    const greeting = `Good ${now.getHours() < 12 ? 'morning' : 'afternoon'}, Mike.`;
+                    setContent([{ type: 'prompt', value: `${greeting}\nWhat's on your mind?` }, { type: 'text', value: '' }]);
+                }
+            } catch (error) {
+                console.error('Failed to load note:', error);
+                Alert.alert('Error', 'Failed to load note');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadNote();
     }, [noteId]);
 
-    const handleTextChange = (newText: string, blockIndex: number) => {
+    const handleTextChange = useCallback((newText: string, blockIndex: number) => {
         setContent(prev => {
             const copy = [...prev];
             const b = copy[blockIndex];
-            if (b && b.type === 'text') (b as any).value = newText;
+            if (b && b.type === 'text') {
+                (b as any).value = newText;
+                setHasUnsavedChanges(true);
+            }
             return copy;
         });
-    };
+    }, []);
 
-    const handleAddImage = async () => {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (perm.status !== 'granted') { Alert.alert('Permission Required', 'Please grant Photo access.'); return; }
-        const res = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.92,
-            selectionLimit: 1,
-        });
-        if (res.canceled) return;
-        const uri = res.assets?.[0]?.uri; if (!uri) return;
-        setContent(prev => [...prev, { type: 'image', url: uri }]);
-    };
+    const handleAddImage = useCallback(async () => {
+        try {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (perm.status !== 'granted') {
+                Alert.alert('Permission Required', 'Photo library access is required to add images.');
+                return;
+            }
+            
+            const res = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.92,
+                selectionLimit: 1,
+                allowsEditing: true,
+                aspect: [16, 9],
+            });
+            
+            if (res.canceled) return;
+            const uri = res.assets?.[0]?.uri;
+            if (!uri) return;
+            
+            setContent(prev => [...prev, { type: 'image', url: uri }]);
+            setHasUnsavedChanges(true);
+        } catch (error) {
+            console.error('Image picker error:', error);
+            Alert.alert('Error', 'Failed to add image. Please try again.');
+        }
+    }, []);
 
-    const handleDelete = (idx: number) => setContent(prev => prev.filter((_, i) => i !== idx));
+    const handleDelete = useCallback((idx: number) => {
+        setContent(prev => prev.filter((_, i) => i !== idx));
+        setHasUnsavedChanges(true);
+    }, []);
     
-    const handleAddText = () => {
+    const handleAddText = useCallback(() => {
         setContent(prev => [...prev, { type: 'text', value: '' }]);
-    };
+        setHasUnsavedChanges(true);
+    }, []);
 
-    const handleRecorded = (localUri: string, durationMs: number, transcript?: string) => {
+    const handleRecorded = useCallback((localUri: string, durationMs: number, transcript?: string) => {
         const blk: ContentBlock = { type: 'audio', url: localUri, duration: mmss(durationMs), transcript: transcript ?? '' };
         setContent(prev => [...prev, blk]);
-    };
+        setHasUnsavedChanges(true);
+    }, []);
 
-    const handleClose = () => router.back();
-    const handleSave = () => Alert.alert('Saved', 'Note saved (demo).');
+    const handleSave = useCallback(async (shouldClose = false) => {
+        try {
+            setIsSaving(true);
+            // TODO: Replace with actual API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            setHasUnsavedChanges(false);
+            
+            if (shouldClose) {
+                router.back();
+            } else {
+                Alert.alert('Saved', 'Note saved successfully!');
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            Alert.alert('Error', 'Failed to save note. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    }, []);
+
+    const handleClose = useCallback(() => {
+        if (hasUnsavedChanges) {
+            Alert.alert(
+                'Unsaved Changes',
+                'You have unsaved changes. Do you want to save before leaving?',
+                [
+                    { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+                    { text: 'Save', onPress: () => handleSave(true) },
+                    { text: 'Cancel', style: 'cancel' }
+                ]
+            );
+        } else {
+            router.back();
+        }
+    }, [hasUnsavedChanges, handleSave]);
+
     
-    const handleAIRespond = async () => {
-        setContent(prev => [...prev, { type: 'text', value: '', isAIGenerating: true }]);
-        
-        setTimeout(() => {
+    const handleAIRespond = useCallback(async () => {
+        try {
+            setContent(prev => [...prev, { type: 'text', value: '', isAIGenerating: true }]);
+            setHasUnsavedChanges(true);
+            
+            // Simulate AI processing delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
             const contentText = content
-                .filter(block => block.type === 'text')
+                .filter(block => block.type === 'text' && !(block as any).isAI)
                 .map(block => (block as any).value)
+                .filter(value => value.trim())
                 .join(' ');
             
             const hasImages = content.some(block => block.type === 'image');
@@ -469,21 +599,60 @@ export default function NoteEditorScreen() {
                     ? { type: 'text', value: aiResponse, isAI: true }
                     : block
             ));
-        }, 1500);
-    };
+        } catch (error) {
+            console.error('AI response error:', error);
+            Alert.alert('Error', 'Failed to generate AI response. Please try again.');
+            // Remove the generating block
+            setContent(prev => prev.filter(block => !(block as any).isAIGenerating));
+        }
+    }, [content]);
 
-    if (isLoading) return <View style={styles.container}><Text>Loading...</Text></View>;
+    if (isLoading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="dark-content" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#020F20" />
+                    <Text style={styles.loadingText}>Loading note...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoidingContainer}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                <View style={[styles.header, { paddingTop: Math.max(insets.top - 8, 0) }]}>
+                    <TouchableOpacity 
+                        onPress={handleClose} 
+                        style={styles.closeButton}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close editor"
+                    >
                         <Text style={styles.closeButtonText}>✕</Text>
                     </TouchableOpacity>
+                    {hasUnsavedChanges && (
+                        <TouchableOpacity 
+                            onPress={() => handleSave()} 
+                            style={styles.saveButton}
+                            disabled={isSaving}
+                            accessibilityRole="button"
+                            accessibilityLabel="Save note"
+                        >
+                            {isSaving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.saveButtonText}>Save</Text>
+                            )}
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-                <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
+                <ScrollView 
+                    contentContainerStyle={styles.contentContainer} 
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <Text style={styles.timestamp}>{new Date().toLocaleString('en-GB').slice(0, 17)}</Text>
 
                     {content.map((block, index) => {
@@ -569,7 +738,7 @@ export default function NoteEditorScreen() {
                 </ScrollView>
 
                 {/* Toolbar */}
-                <View style={styles.toolbar}>
+                <View style={[styles.toolbar, { paddingBottom: insets.bottom + 16 }]}>
                     <TouchableOpacity onPress={() => setShowRecorder(true)}>
                         <Image source={require('../../assets/images/record.png')} style={styles.toolbarIcon} />
                     </TouchableOpacity>
@@ -598,17 +767,87 @@ export default function NoteEditorScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     keyboardAvoidingContainer: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'flex-end', padding: 16 },
-    closeButton: { padding: 8 },
-    closeButtonText: { fontSize: 24, color: '#8E8E93', fontWeight: '300' },
+    header: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        paddingTop: 14,
+    },
+    closeButton: { 
+        padding: 14,  // 增加按钮内边距，让点击区域更大
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 44,  // 确保最小点击区域
+        minHeight: 44
+    },
+    closeButtonText: { 
+        fontSize: 24, 
+        color: '#8E8E93', 
+        fontWeight: '300',
+        lineHeight: 24  // 确保文字垂直居中
+    },
+    saveButton: {
+        backgroundColor: '#020F20',
+        paddingHorizontal: 16,
+        paddingVertical: 10,  // 调整内边距使其与返回按钮对齐
+        borderRadius: 12,
+        minWidth: 60,
+        minHeight: 44,  // 确保与返回按钮同样高度
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    // Loading state
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        color: '#8E8E93',
+        fontSize: 16,
+    },
     contentContainer: { paddingHorizontal: 24, paddingBottom: 24 },
     timestamp: { fontSize: 13, color: '#AEAEB2', marginBottom: 24 },
     promptText: { fontSize: 22, lineHeight: 32, color: '#020F20', marginBottom: 24, fontWeight: '600' },
     textBlockContainer: { marginBottom: 16, position: 'relative' },
-    textInput: { fontSize: 18, lineHeight: 28, color: '#020F20', minHeight: 100, backgroundColor: '#FAFAFC', borderRadius: 12, padding: 12 },
-    image: { width: '100%', aspectRatio: 16 / 9, borderRadius: 16 },
+    textInput: { 
+        fontSize: 18, 
+        lineHeight: 28, 
+        color: '#020F20', 
+        minHeight: 100, 
+        backgroundColor: '#FAFAFC', 
+        borderRadius: 12, 
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#F0F0F3',
+    },
+    image: { 
+        width: '100%', 
+        aspectRatio: 16 / 9, 
+        borderRadius: 16,
+        backgroundColor: '#F5F5F5',
+    },
 
-    toolbar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, paddingBottom: Platform.OS === 'ios' ? 24 : 16, borderTopWidth: 1, borderTopColor: '#F2F2F7' },
+    toolbar: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-around', 
+        alignItems: 'center', 
+        paddingHorizontal: 24, 
+        paddingTop: 16,
+        borderTopWidth: 1, 
+        borderTopColor: '#F2F2F7',
+        backgroundColor: '#FFFFFF',
+    },
     toolbarIcon: { width: 28, height: 28, resizeMode: 'contain' },
     toolbarTextBtn: { 
         width: 32, 
@@ -623,8 +862,22 @@ const styles = StyleSheet.create({
         fontSize: 14, 
         fontWeight: '600' 
     },
-    respondButton: { backgroundColor: '#333231', borderRadius: 99, paddingVertical: 16, paddingHorizontal: 40 },
-    respondButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    respondButton: { 
+        backgroundColor: '#333231', 
+        borderRadius: 99, 
+        paddingVertical: 12, 
+        paddingHorizontal: 32,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    respondButtonText: { 
+        color: '#FFFFFF', 
+        fontSize: 16, 
+        fontWeight: '600' 
+    },
 
     // Audio card（升级样式）
     audioContainer: {

@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>shiro</string>
-          <string>com.anonymous.Shiro</string>
+          <string>com.freedomai.shiro</string>
         </array>
       </dict>
     </array>
@@ -45,6 +45,28 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Shiro 需要访问您的日历，以便为您建议合适的反思时刻。</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Shiro 需要访问您的日历，以便为您建议合适的反思时刻。</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Shiro 需要使用您的位置信息，以便在您所在的地方提供贴心的提示。</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Shiro 需要使用您的麦克风，以便为您录制音频笔记。</string>
+    <key>NSMotionUsageDescription</key>
+    <string>Shiro 使用运动数据来提高基于位置的建议的准确性。</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Shiro 需要保存图片到您的照片库（可选）。</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Shiro 需要访问您的照片库以选择图片。</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your reminders</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your reminders</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+/**
+ * @fileoverview ChatDialog component - AI chat interface modal
+ * 
+ * Optimized with proper TypeScript, performance enhancements,
+ * consistent styling patterns, and better code organization.
+ */
+
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
     Modal,
     View,
@@ -11,175 +18,263 @@ import {
     Image,
     ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChatMessage, ModalProps, COLORS, SPACING, ANIMATIONS, LAYOUT } from '@/types';
 
+// Constants
 const { height: screenHeight } = Dimensions.get('window');
+const AI_RESPONSE_DELAY = 3000;
+const MESSAGE_SEPARATOR = '; ';
 
-// Defines the structure for a single message object.
-type Message = {
-    text: string;
-    type: 'user' | 'ai'; // 'user' for messages sent by the user, 'ai' for responses.
-};
+// Component types
+type ChatDialogProps = ModalProps;
 
-// Defines the props accepted by the ChatDialog component.
-type ChatDialogProps = {
-    visible: boolean; // Controls the visibility of the modal.
-    onClose: () => void; // Function to call when the modal should be closed.
-};
+interface MessageBubbleProps {
+    message: ChatMessage;
+    index: number;
+}
+
+// Message Bubble Component
+const MessageBubble = memo<MessageBubbleProps>(({ message, index }) => {
+    if (message.type === 'ai') {
+        return (
+            <View key={index} style={styles.chatMessageContainer}>
+                <View style={styles.avatar}>
+                    <Image
+                        source={require('@/assets/images/chatdialog.png')}
+                        style={styles.avatarImage}
+                        accessibilityLabel="AI Avatar"
+                    />
+                </View>
+                <View style={styles.chatBubble}>
+                    <Text style={styles.chatText} selectable>
+                        {message.text}
+                    </Text>
+                </View>
+            </View>
+        );
+    }
+
+    return (
+        <View key={index} style={styles.userMessageContainer}>
+            <View style={styles.userChatBubble}>
+                <Text style={styles.userChatText} selectable>
+                    {message.text}
+                </Text>
+            </View>
+        </View>
+    );
+});
+
+MessageBubble.displayName = 'MessageBubble';
 
 /**
- * A slide-up chat dialog component that simulates a conversation with an AI.
- * It waits for the user to stop sending messages and typing before generating a response.
- * The AI's response concatenates all messages the user sent in their last "turn".
- * @param {ChatDialogProps} props - The component's props.
+ * ChatDialog - AI chat interface modal component
+ * 
+ * Features:
+ * - Real-time message exchange with AI simulation
+ * - Auto-scroll to bottom on new messages
+ * - Dynamic send/record button states
+ * - Proper error handling and performance optimization
  */
-export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
-    // --- STATE MANAGEMENT ---
-    // Stores the current text in the input field.
-    const [inputValue, setInputValue] = useState('');
-    // Stores the entire conversation history as an array of Message objects.
-    const [messages, setMessages] = useState<Message[]>([
-        { text: 'How are you doing lately?', type: 'ai' },
+const ChatDialog = memo<ChatDialogProps>(({ visible, onClose }) => {
+    const insets = useSafeAreaInsets();
+    
+    // State management
+    const [inputValue, setInputValue] = useState<string>('');
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        { text: 'How are you doing lately?', type: 'ai', timestamp: Date.now() },
     ]);
+    const [isTyping, setIsTyping] = useState<boolean>(false);
 
-    // --- REFS ---
-    // Holds the timer ID for the AI's response delay. Using a ref prevents re-renders.
+    // Refs for timer and scroll management
     const timerRef = useRef<NodeJS.Timeout | null>(null);
-    // Holds a reference to the ScrollView to enable automatic scrolling.
     const scrollViewRef = useRef<ScrollView>(null);
+    const textInputRef = useRef<TextInput>(null);
 
-    // --- EFFECTS ---
+    // Memoized handlers
+    const handleInputChange = useCallback((text: string) => {
+        setInputValue(text);
+        setIsTyping(text.trim().length > 0);
+    }, []);
 
-    /**
-     * This is the core effect that manages the AI's response logic.
-     * It runs whenever the user sends a message (changing `messages`) OR types in the input
-     * (changing `inputValue`), allowing it to cancel the AI's response if the user is active.
-     */
+    const handleSendMessage = useCallback(() => {
+        const trimmedInput = inputValue.trim();
+        if (!trimmedInput) return;
+
+        try {
+            const userMessage: ChatMessage = {
+                text: trimmedInput,
+                type: 'user',
+                timestamp: Date.now(),
+            };
+            
+            setMessages(prev => [...prev, userMessage]);
+            setInputValue('');
+            setIsTyping(false);
+            
+            // Focus back to input for better UX
+            setTimeout(() => {
+                textInputRef.current?.focus();
+            }, 100);
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
+    }, [inputValue]);
+
+    const generateAIResponse = useCallback((userMessages: ChatMessage[]) => {
+        try {
+            const concatenatedText = userMessages
+                .map(msg => msg.text)
+                .join(MESSAGE_SEPARATOR);
+
+            const aiResponse: ChatMessage = {
+                text: `I received: "${concatenatedText}"`,
+                type: 'ai',
+                timestamp: Date.now(),
+            };
+
+            setMessages(prev => [...prev, aiResponse]);
+        } catch (error) {
+            console.error('Error generating AI response:', error);
+            // Fallback response
+            const fallbackResponse: ChatMessage = {
+                text: 'Sorry, I encountered an error. Please try again.',
+                type: 'ai',
+                timestamp: Date.now(),
+            };
+            setMessages(prev => [...prev, fallbackResponse]);
+        }
+    }, []);
+
+    // AI response logic with proper cleanup
     useEffect(() => {
-        // 1. Always clear any existing timer.
-        // This is the crucial step that "resets" the AI's response countdown
-        // every time the user takes an action (sends a message or types).
         if (timerRef.current) {
             clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
 
-        // 2. Define the conditions for the AI to respond.
         const lastMessage = messages[messages.length - 1];
-        const userIsNotTyping = inputValue.trim() === '';
+        const shouldGenerateResponse = 
+            lastMessage?.type === 'user' && 
+            !isTyping && 
+            inputValue.trim() === '';
 
-        // 3. Set a new timer ONLY if the user has just sent a message AND is not currently typing.
-        if (lastMessage && lastMessage.type === 'user' && userIsNotTyping) {
-            // Start a 3-second countdown.
-            // @ts-ignore
+        if (shouldGenerateResponse) {
             timerRef.current = setTimeout(() => {
-                // --- AI Response Generation Logic ---
-
-                // Find the index of the last AI message to define the start of the user's "turn".
                 const lastAiMessageIndex = messages.map(m => m.type).lastIndexOf('ai');
-
-                // Slice the array to get all user messages sent since the last AI response.
-                const userMessagesInTurn = messages.slice(lastAiMessageIndex + 1);
-
-                // Extract the text from each message and join them into a single string.
-                const concatenatedText = userMessagesInTurn
-                    .map((msg) => msg.text)
-                    .join('; '); // Using '; ' as a separator.
-
-                // Create the new AI response message.
-                const aiResponse: Message = {
-                    text: `I received: "${concatenatedText}"`,
-                    type: 'ai',
-                };
-
-                // Add the AI's response to the conversation history.
-                setMessages((prevMessages) => [...prevMessages, aiResponse]);
-            }, 3000); // 3-second (3000ms) delay.
+                const userMessagesInTurn = messages.slice(lastAiMessageIndex + 1)
+                    .filter((msg): msg is ChatMessage => msg.type === 'user');
+                
+                if (userMessagesInTurn.length > 0) {
+                    generateAIResponse(userMessagesInTurn);
+                }
+            }, AI_RESPONSE_DELAY);
         }
 
-        // Cleanup function: This will be called if the component unmounts.
-        // It ensures no timers are left running in the background.
         return () => {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
+                timerRef.current = null;
             }
         };
-    }, [messages, inputValue]); // Dependencies: The effect re-runs if `messages` or `inputValue` changes.
+    }, [messages, inputValue, isTyping, generateAIResponse]);
 
-    /**
-     * This effect handles automatically scrolling to the bottom of the chat
-     * whenever a new message is added to the conversation.
-     */
+    // Auto-scroll to bottom on new messages
     useEffect(() => {
-        if (scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: true });
+        if (scrollViewRef.current && messages.length > 0) {
+            // Small delay to ensure layout is complete
+            setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
         }
-    }, [messages]); // Dependency: Runs only when the `messages` array changes.
+    }, [messages]);
 
-    /**
-     * Handles the action of sending a user's message.
-     * It adds the new message to the state and clears the input field.
-     */
-    const handleSendMessage = () => {
-        if (inputValue.trim()) {
-            setMessages([...messages, { text: inputValue, type: 'user' }]);
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!visible) {
             setInputValue('');
+            setIsTyping(false);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
+            }
         }
-    };
+    }, [visible]);
 
-    // Determines whether to show the "send" icon or the "microphone" icon.
+    // Computed values
     const showSendIcon = inputValue.trim().length > 0;
+    const modalHeight = screenHeight * LAYOUT.MODAL_HEIGHT_PERCENTAGE;
 
     return (
         <Modal
             visible={visible}
-            animationType="slide"
-            transparent={true}
+            animationType={ANIMATIONS.MODAL_ANIMATION_TYPE}
+            transparent
             onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <Pressable style={styles.modalBackground} onPress={onClose}>
-                {/* By stopping propagation, tapping inside the modal won't close it. */}
-                <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+            <Pressable 
+                style={styles.modalBackground} 
+                onPress={onClose}
+                accessibilityLabel="Close chat dialog"
+            >
+                <Pressable 
+                    style={[
+                        styles.modalContainer,
+                        {
+                            height: modalHeight,
+                            paddingBottom: Math.max(insets.bottom, SPACING.MD),
+                        }
+                    ]} 
+                    onPress={(e) => e.stopPropagation()}
+                >
+                    {/* Header indicator */}
+                    <View style={styles.modalHandle} />
+                    
+                    {/* Messages container */}
                     <ScrollView
                         ref={scrollViewRef}
                         style={styles.messagesContainer}
-                        contentContainerStyle={{ paddingBottom: 10 }}
+                        contentContainerStyle={styles.messagesContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
                     >
                         {messages.map((message, index) => (
-                            <View key={index}>
-                                {message.type === 'ai' ? (
-                                    // AI Message Bubble
-                                    <View style={styles.chatMessageContainer}>
-                                        <View style={styles.avatar}>
-                                            <Image
-                                                source={require("@/assets/images/chatdialog.png")}
-                                                style={styles.avatarImage}
-                                            />
-                                        </View>
-                                        <View style={styles.chatBubble}>
-                                            <Text style={styles.chatText}>{message.text}</Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    // User Message Bubble
-                                    <View style={styles.userMessageContainer}>
-                                        <View style={styles.userChatBubble}>
-                                            <Text style={styles.userChatText}>{message.text}</Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
+                            <MessageBubble 
+                                key={`${message.timestamp}-${index}`} 
+                                message={message} 
+                                index={index}
+                            />
                         ))}
                     </ScrollView>
 
-                    {/* Input bar at the bottom */}
+                    {/* Input bar */}
                     <View style={styles.inputBarContainer}>
                         <TextInput
+                            ref={textInputRef}
                             style={styles.textInput}
-                            placeholder="input"
-                            placeholderTextColor="#9A9FA6"
+                            placeholder="Type your message..."
+                            placeholderTextColor={COLORS.SECONDARY}
                             value={inputValue}
-                            onChangeText={setInputValue}
+                            onChangeText={handleInputChange}
+                            onSubmitEditing={handleSendMessage}
+                            returnKeyType="send"
+                            blurOnSubmit={false}
+                            multiline
+                            maxLength={1000}
+                            accessibilityLabel="Message input"
                         />
-                        <TouchableOpacity style={[styles.actionButton, showSendIcon && styles.sendButtonActive]} onPress={handleSendMessage}>
+                        <TouchableOpacity 
+                            style={[
+                                styles.actionButton, 
+                                showSendIcon && styles.sendButtonActive
+                            ]} 
+                            onPress={handleSendMessage}
+                            disabled={!showSendIcon}
+                            accessibilityRole="button"
+                            accessibilityLabel={showSendIcon ? "Send message" : "Voice record"}
+                        >
                             <Image
                                 source={
                                     showSendIcon
@@ -187,6 +282,7 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
                                         : require('@/assets/images/record.png')
                                 }
                                 style={showSendIcon ? styles.sendImage : styles.micImage}
+                                accessibilityIgnoresInvertColors
                             />
                         </TouchableOpacity>
                     </View>
@@ -194,7 +290,9 @@ export default function ChatDialog({ visible, onClose }: ChatDialogProps) {
             </Pressable>
         </Modal>
     );
-}
+});
+
+ChatDialog.displayName = 'ChatDialog';
 
 const styles = StyleSheet.create({
     modalBackground: {
@@ -203,104 +301,132 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
     },
     modalContainer: {
-        height: screenHeight * 0.80,
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 20,
+        backgroundColor: COLORS.WHITE,
+        borderTopLeftRadius: LAYOUT.MODAL_BORDER_RADIUS,
+        borderTopRightRadius: LAYOUT.MODAL_BORDER_RADIUS,
+        paddingHorizontal: SPACING.LG,
+        paddingTop: SPACING.LG,
+        shadowColor: COLORS.BLACK,
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    modalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: SPACING.LG,
     },
     messagesContainer: {
         flex: 1,
     },
+    messagesContent: {
+        paddingBottom: SPACING.SM,
+        flexGrow: 1,
+    },
     chatMessageContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginTop: 18,
+        marginTop: SPACING.LG,
         marginRight: '20%',
     },
     avatar: {
         width: 45,
         height: 45,
-        borderRadius: 20,
-        marginRight: 10,
+        borderRadius: 22,
+        marginRight: SPACING.SM,
         overflow: 'hidden',
+        backgroundColor: '#F5F5F5',
     },
     avatarImage: {
         width: '100%',
         height: '100%',
+        resizeMode: 'cover',
     },
     chatBubble: {
         backgroundColor: '#FAF7FA',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: SPACING.MD,
+        paddingHorizontal: SPACING.LG,
         borderRadius: 18,
         borderTopLeftRadius: 4,
+        maxWidth: '85%',
     },
     chatText: {
-        fontSize: 18,
-        color: '#020F20',
+        fontSize: 16,
+        color: COLORS.PRIMARY,
+        lineHeight: 22,
     },
     userMessageContainer: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginTop: 18,
+        marginTop: SPACING.LG,
         marginLeft: '20%',
     },
     userChatBubble: {
         backgroundColor: '#F3F3F3',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: SPACING.MD,
+        paddingHorizontal: SPACING.LG,
         borderRadius: 18,
         borderTopRightRadius: 4,
+        maxWidth: '85%',
     },
     userChatText: {
-        fontSize: 18,
-        color: '#020F20',
+        fontSize: 16,
+        color: COLORS.PRIMARY,
+        lineHeight: 22,
     },
     inputBarContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 14,
-        paddingLeft: 20,
-        paddingRight: 18,
-        marginBottom: 11,
-        marginTop: 10,
-        shadowColor: 'rgba(0,0,0,0.88)',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        height: 55,
-        shadowOpacity: 0.2,
-        shadowRadius: 3.8,
-        elevation: 6,
+        alignItems: 'flex-end',
+        backgroundColor: COLORS.WHITE,
+        borderRadius: LAYOUT.INPUT_BORDER_RADIUS,
+        paddingLeft: SPACING.LG,
+        paddingRight: SPACING.LG,
+        paddingVertical: SPACING.SM,
+        marginTop: SPACING.MD,
+        minHeight: 55,
+        maxHeight: 120,
+        shadowColor: 'rgba(0, 0, 0, 0.1)',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 4,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'rgba(0, 0, 0, 0.08)',
     },
     textInput: {
         flex: 1,
-        fontSize: 20,
-        color: '#020F20',
+        fontSize: 16,
+        color: COLORS.PRIMARY,
         fontWeight: '400',
-        height: 50,
+        maxHeight: 80,
+        lineHeight: 20,
+        paddingVertical: SPACING.SM,
     },
     actionButton: {
-        width: 30,
-        height: 30,
+        width: 36,
+        height: 36,
         justifyContent: 'center',
         alignItems: 'center',
+        borderRadius: 18,
+        marginLeft: SPACING.SM,
     },
     sendButtonActive: {
-        backgroundColor: '#020F20',
-        borderRadius: 15,
+        backgroundColor: COLORS.PRIMARY,
     },
     micImage: {
-        width: 26,
-        height: 26,
+        width: 22,
+        height: 22,
+        tintColor: COLORS.SECONDARY,
     },
     sendImage: {
-        width: 20,
-        height: 22,
+        width: 18,
+        height: 18,
+        tintColor: COLORS.WHITE,
     },
 });
+
+export default ChatDialog;

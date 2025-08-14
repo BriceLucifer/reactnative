@@ -1,4 +1,11 @@
-import React, { useEffect } from 'react';
+/**
+ * @fileoverview ProfileDrawer component - slide-out navigation drawer
+ * 
+ * Optimized with proper TypeScript, performance enhancements,
+ * and consistent styling patterns.
+ */
+
+import React, { useEffect, useCallback, memo } from 'react';
 import {
     Dimensions,
     Image,
@@ -28,40 +35,121 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalProps, COLORS, SPACING, ANIMATIONS, LAYOUT } from '@/types';
 
+// Constants
 const { width } = Dimensions.get('window');
-const DRAWER_WIDTH = width * 0.80;
+const DRAWER_WIDTH = width * LAYOUT.DRAWER_WIDTH_PERCENTAGE;
 const OPEN_X = 0;
 const CLOSED_X = DRAWER_WIDTH;
+const TARGET_PROGRESS = 0.75;
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-interface ProfileDrawerProps {
-    visible: boolean;
-    onClose: () => void;
+// Component types
+type ProfileDrawerProps = ModalProps;
+
+interface MenuItemProps {
+    icon: any;
+    label: string;
+    onPress?: () => void;
+    index: number;
+    translateX: SharedValue<number>;
 }
 
-export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) {
+// Menu Item Component
+const MenuItem = memo<MenuItemProps>(({ icon, label, onPress, index, translateX }) => {
+    const itemAnimatedStyle = useAnimatedStyle(() => {
+        const baseOffset = 12 + index * 5;
+        const dx = interpolate(translateX.value, [OPEN_X, CLOSED_X], [0, baseOffset], Extrapolate.CLAMP);
+        const op = interpolate(translateX.value, [OPEN_X, CLOSED_X * 0.6, CLOSED_X], [1, 0.6, 0], Extrapolate.CLAMP);
+        return { transform: [{ translateX: dx }], opacity: op };
+    });
+
+    return (
+        <Animated.View style={[styles.menuItemWrap, itemAnimatedStyle]}>
+            <Pressable
+                onPress={onPress}
+                style={({ pressed }) => [
+                    styles.menuItem,
+                    pressed && { opacity: 0.7, transform: [{ translateY: 0.5 }] },
+                ]}
+                android_ripple={{ borderless: false }}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+            >
+                <Image source={icon} style={styles.menuIcon} />
+                <Text style={styles.menuLabel}>{label}</Text>
+                <View style={styles.menuSpacer} />
+                <Text style={styles.chevron}>&rsquo;</Text>
+            </Pressable>
+        </Animated.View>
+    );
+});
+
+MenuItem.displayName = 'MenuItem';
+
+// Main Component
+const ProfileDrawer = memo<ProfileDrawerProps>(({ visible, onClose }) => {
     const insets = useSafeAreaInsets();
     const translateX = useSharedValue<number>(CLOSED_X);
-
-    const TARGET_PROGRESS = 0.75;
     const progress = useSharedValue<number>(0);
 
-    // Get Pro：先关抽屉再跳转
-    const handleGetPro = () => {
-        onClose();
-        setTimeout(() => { router.push('/screens/GetShiroPro'); }, 250);
-    };
+    // Navigation handlers with proper error handling
+    const handleGetPro = useCallback(() => {
+        try {
+            onClose();
+            setTimeout(() => { 
+                router.push('/screens/GetShiroPro'); 
+            }, ANIMATIONS.TIMING_CONFIG.duration);
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, [onClose]);
 
-    const handleDiscord = () => router.push('/screens/DiscordLink');
-    const handleTelegram = () => router.push('/screens/Telegram');
-    const handlePassword = () => router.push('/screens/PasswordLock');
-    const handleFeedBack = () => router.push('/screens/Feedback');
+    const handleDiscord = useCallback(() => {
+        try {
+            router.push('/screens/DiscordLink');
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, []);
+
+    const handleTelegram = useCallback(() => {
+        try {
+            router.push('/screens/Telegram');
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, []);
+
+    const handlePassword = useCallback(() => {
+        try {
+            router.push('/screens/PasswordLock');
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, []);
+
+    const handleFeedBack = useCallback(() => {
+        try {
+            router.push('/screens/Feedback');
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, []);
+
+    const handleSignOut = useCallback(() => {
+        try {
+            router.push('/');
+        } catch (error) {
+            console.error('Navigation error:', error);
+        }
+    }, []);
 
     useEffect(() => {
         if (visible) {
-            translateX.value = withSpring(OPEN_X, { damping: 14, stiffness: 160 });
+            translateX.value = withSpring(OPEN_X, ANIMATIONS.SPRING_CONFIG);
             progress.value = 0;
             progress.value = withDelay(120, withTiming(TARGET_PROGRESS, {
                 duration: 900,
@@ -71,7 +159,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
             translateX.value = withTiming(CLOSED_X, { duration: 260 });
             progress.value = withTiming(0, { duration: 200 });
         }
-    }, [visible]);
+    }, [visible, translateX, progress]);
 
     const gesture = Gesture.Pan()
         .onUpdate((event) => {
@@ -79,16 +167,22 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
             translateX.value = Math.min(CLOSED_X, dx);
         })
         .onEnd((event) => {
-            const shouldClose = translateX.value > DRAWER_WIDTH * 0.28 || event.velocityX > 600;
+            const shouldClose = translateX.value > DRAWER_WIDTH * ANIMATIONS.GESTURE_CONFIG.threshold || 
+                               event.velocityX > ANIMATIONS.GESTURE_CONFIG.velocity;
             if (shouldClose) {
-                translateX.value = withTiming(CLOSED_X, { duration: 220 }, () => { runOnJS(onClose)(); });
+                translateX.value = withTiming(CLOSED_X, { duration: 220 }, () => {
+                    runOnJS(onClose)();
+                });
                 progress.value = withTiming(0, { duration: 200 });
             } else {
-                translateX.value = withSpring(OPEN_X, { damping: 16, stiffness: 180 });
+                translateX.value = withSpring(OPEN_X, {
+                    damping: 16,
+                    stiffness: 180,
+                });
             }
         });
 
-    // ✅ 调整为 1→0，这样暗度不打折
+    // Derived values for animations
     const backdropOpacity = useDerivedValue(() =>
         interpolate(translateX.value, [OPEN_X, CLOSED_X], [1, 0], Extrapolate.CLAMP)
     );
@@ -108,7 +202,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
 
     return (
         <>
-            {/* ✅ 背景模糊遮罩（iOS18 下拉感）：Blur + 暗化层 + 点击关闭 */}
+            {/* Background overlay with blur effect */}
             <Animated.View
                 pointerEvents={visible ? 'auto' : 'none'}
                 style={[styles.overlay, overlayAnimatedStyle]}
@@ -117,7 +211,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
                 <View
                     style={[
                         StyleSheet.absoluteFill,
-                        { backgroundColor: 'rgba(0,0,0,0.22)' } // 暗化强度可调 0.18~0.30
+                        { backgroundColor: 'rgba(0,0,0,0.22)' }
                     ]}
                 />
                 <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -177,7 +271,7 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
                                 </View>
 
                                 <Text style={styles.usageHint}>
-                                    You&#39;ve used 8 AI conversations this month. Upgrade for unlimited access.
+                                    You&rsquo;ve used 8 AI conversations this month. Upgrade for unlimited access.
                                 </Text>
 
                                 <Pressable
@@ -186,6 +280,8 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
                                         pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] }
                                     ]}
                                     onPress={handleGetPro}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Upgrade to Pro"
                                 >
                                     <Text style={styles.upgradeText}>Upgrade to Pro</Text>
                                 </Pressable>
@@ -194,59 +290,52 @@ export default function ProfileDrawer({ visible, onClose }: ProfileDrawerProps) 
                     </View>
 
                     <View style={styles.menuList}>
-                        <MenuItem index={0} translateX={translateX} icon={require('../assets/images/discord.png')} label="Discord" onPress={handleDiscord} />
-                        <MenuItem index={1} translateX={translateX} icon={require('../assets/images/telegram.png')} label="Telegram" onPress={handleTelegram} />
-                        <MenuItem index={2} translateX={translateX} icon={require('../assets/images/lock.png')} label="Password Lock" onPress={handlePassword} />
-                        <MenuItem index={3} translateX={translateX} icon={require('../assets/images/feedback.png')} label="Feedback" onPress={handleFeedBack} />
-                        <MenuItem index={4} translateX={translateX} icon={require('../assets/images/logout.png')} label="Sign out" onPress={() => router.push('/')} />
+                        <MenuItem 
+                            index={0} 
+                            translateX={translateX} 
+                            icon={require('../assets/images/discord.png')} 
+                            label="Discord" 
+                            onPress={handleDiscord} 
+                        />
+                        <MenuItem 
+                            index={1} 
+                            translateX={translateX} 
+                            icon={require('../assets/images/telegram.png')} 
+                            label="Telegram" 
+                            onPress={handleTelegram} 
+                        />
+                        <MenuItem 
+                            index={2} 
+                            translateX={translateX} 
+                            icon={require('../assets/images/lock.png')} 
+                            label="Password Lock" 
+                            onPress={handlePassword} 
+                        />
+                        <MenuItem 
+                            index={3} 
+                            translateX={translateX} 
+                            icon={require('../assets/images/feedback.png')} 
+                            label="Feedback" 
+                            onPress={handleFeedBack} 
+                        />
+                        <MenuItem 
+                            index={4} 
+                            translateX={translateX} 
+                            icon={require('../assets/images/logout.png')} 
+                            label="Sign out" 
+                            onPress={handleSignOut} 
+                        />
                     </View>
                 </Animated.View>
             </GestureDetector>
         </>
     );
-}
+});
 
-function MenuItem({
-                      icon,
-                      label,
-                      onPress,
-                      index,
-                      translateX,
-                  }: {
-    icon: any;
-    label: string;
-    onPress?: () => void;
-    index: number;
-    translateX: SharedValue<number>;
-}) {
-    const itemAnimatedStyle = useAnimatedStyle(() => {
-        const baseOffset = 12 + index * 5;
-        const dx = interpolate(translateX.value, [OPEN_X, CLOSED_X], [0, baseOffset], Extrapolate.CLAMP);
-        const op = interpolate(translateX.value, [OPEN_X, CLOSED_X * 0.6, CLOSED_X], [1, 0.6, 0], Extrapolate.CLAMP);
-        return { transform: [{ translateX: dx }], opacity: op };
-    });
-
-    return (
-        <Animated.View style={[styles.menuItemWrap, itemAnimatedStyle]}>
-            <Pressable
-                onPress={onPress}
-                style={({ pressed }) => [
-                    styles.menuItem,
-                    pressed && { opacity: 0.7, transform: [{ translateY: 0.5 }] },
-                ]}
-                android_ripple={{ borderless: false }}
-            >
-                <Image source={icon} style={styles.menuIcon} />
-                <Text style={styles.menuLabel}>{label}</Text>
-                <View style={styles.menuSpacer} />
-                <Text style={styles.chevron}>{'›'}</Text>
-            </Pressable>
-        </Animated.View>
-    );
-}
+ProfileDrawer.displayName = 'ProfileDrawer';
 
 const styles = StyleSheet.create({
-    // ✅ 改成透明；实际暗度由子层控制（Blur + 半透明黑）
+    // Overlay with blur effect
     overlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'transparent',
@@ -258,9 +347,9 @@ const styles = StyleSheet.create({
         right: 0,
         top: 0,
         bottom: 0,
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 20,
-        shadowColor: '#000',
+        backgroundColor: COLORS.WHITE,
+        paddingHorizontal: SPACING.LG,
+        shadowColor: COLORS.BLACK,
         shadowOffset: { width: -4, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 20,
@@ -272,8 +361,8 @@ const styles = StyleSheet.create({
     },
     handle: {
         position: 'absolute',
-        left: 10,
-        top: 12,
+        left: SPACING.SM + 2,
+        top: SPACING.MD,
         width: 36,
         height: 4,
         borderRadius: 2,
@@ -281,7 +370,7 @@ const styles = StyleSheet.create({
     },
     profileHeader: {
         alignItems: 'center',
-        marginBottom: 28,
+        marginBottom: SPACING.XL + 4,
     },
     avatarRing: {
         padding: 2,
@@ -301,7 +390,7 @@ const styles = StyleSheet.create({
         color: '#263238',
     },
     name: {
-        marginTop: 14,
+        marginTop: SPACING.MD - 2,
         fontSize: 22,
         fontWeight: '700',
         color: '#0F172A',
@@ -310,7 +399,7 @@ const styles = StyleSheet.create({
     usageWrap: {
         alignSelf: 'stretch',
         width: '100%',
-        marginBottom: 24,
+        marginBottom: SPACING.LG,
         borderRadius: 16,
         overflow: 'hidden',
     },
@@ -326,15 +415,15 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.06)',
     },
     usageTitle: {
-        color: '#FFFFFF',
+        color: COLORS.WHITE,
         fontWeight: '700',
         fontSize: 16,
-        marginBottom: 12,
+        marginBottom: SPACING.MD,
         letterSpacing: 0.2,
     },
     progressBarContainer: {
         width: '100%',
-        marginBottom: 8,
+        marginBottom: SPACING.SM,
     },
     progressTrack: {
         width: '100%',
@@ -343,18 +432,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#1C2433',
         overflow: 'hidden',
     },
-    progressFill: { height: '100%', borderRadius: 6 },
+    progressFill: { 
+        height: '100%', 
+        borderRadius: 6 
+    },
     usageHint: {
         color: 'rgba(245,245,245,0.85)',
         fontSize: 12,
         lineHeight: 16,
-        marginTop: 8,
+        marginTop: SPACING.SM,
     },
     upgradeButton: {
         backgroundColor: '#F5F7FF',
-        paddingVertical: 10,
+        paddingVertical: SPACING.SM + 2,
         borderRadius: 999,
-        marginTop: 10,
+        marginTop: SPACING.SM + 2,
         alignItems: 'center',
     },
     upgradeText: {
@@ -362,17 +454,40 @@ const styles = StyleSheet.create({
         color: '#0F172A',
         letterSpacing: 0.3,
     },
-    menuList: { gap: 16, marginTop: 6 },
-    menuItemWrap: { borderRadius: 12 },
+    menuList: { 
+        gap: SPACING.MD, 
+        marginTop: 6 
+    },
+    menuItemWrap: { 
+        borderRadius: LAYOUT.BUTTON_BORDER_RADIUS 
+    },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: SPACING.MD,
         paddingHorizontal: 6,
-        borderRadius: 12,
+        borderRadius: LAYOUT.BUTTON_BORDER_RADIUS,
     },
-    menuIcon: { width: 28, height: 28, resizeMode: 'contain', marginRight: 10 },
-    menuLabel: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-    menuSpacer: { flex: 1 },
-    chevron: { fontSize: 22, color: 'rgba(15,23,42,0.35)', marginLeft: 6, marginRight: 2 },
+    menuIcon: { 
+        width: 28, 
+        height: 28, 
+        resizeMode: 'contain', 
+        marginRight: SPACING.SM + 2 
+    },
+    menuLabel: { 
+        fontSize: 16, 
+        fontWeight: '600', 
+        color: '#0F172A' 
+    },
+    menuSpacer: { 
+        flex: 1 
+    },
+    chevron: { 
+        fontSize: 22, 
+        color: 'rgba(15,23,42,0.35)', 
+        marginLeft: 6, 
+        marginRight: 2 
+    },
 });
+
+export default ProfileDrawer;
