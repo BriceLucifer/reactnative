@@ -13,7 +13,7 @@ import {
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// 功能列表项组件 (无变动)
+// A single, reusable component for rendering the feature items.
 function FeatureItem({ title, description }: { title: string, description: string }) {
     return (
         <View style={styles.featureItem}>
@@ -26,12 +26,12 @@ function FeatureItem({ title, description }: { title: string, description: strin
     );
 }
 
-// 主屏幕组件
+// The main component for the "Get Pro" screen.
 export default function GetShiroPro() {
     const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
 
     const handleStartPress = () => {
-        console.log('Starting purchase for plan:', selectedPlan);
+        console.log('Attempting to purchase the', selectedPlan, 'plan.');
     };
 
     return (
@@ -47,93 +47,104 @@ export default function GetShiroPro() {
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                    <Text style={styles.title}>Get Shiro Pro</Text>
+                    <View>
+                        <Text style={styles.title}>Get Shiro Pro</Text>
 
-                    <View style={styles.featuresList}>
-                        <FeatureItem
-                            title="Advanced AI Feedback"
-                            description="Deeper, personalized insights on your thoughts."
-                        />
-                        <FeatureItem
-                            title="Long-term Memory Chats"
-                            description="Shiro remembers everything you share."
-                        />
-                        <FeatureItem
-                            title="Voice-to-Text Transcription"
-                            description="Effortlessly turn your voice into entries."
-                        />
-                        <FeatureItem
-                            title="20% Off Annual Plan"
-                            description="Commit yearly and save more."
-                        />
+                        <View style={styles.featuresList}>
+                            <FeatureItem
+                                title="Advanced AI Feedback"
+                                description="Deeper, personalized insights on your thoughts."
+                            />
+                            <FeatureItem
+                                title="Long-term Memory Chats"
+                                description="Shiro remembers everything you share."
+                            />
+                            <FeatureItem
+                                title="Voice-to-Text Transcription"
+                                description="Effortlessly turn your voice into entries."
+                            />
+                            <FeatureItem
+                                title="20% Off Annual Plan"
+                                description="Commit yearly and save more."
+                            />
+                        </View>
+
+                        {/* Annual Plan Option */}
+                        <Pressable
+                            style={[
+                                styles.planOption,
+                                selectedPlan === 'annual' && styles.planOptionSelected,
+                            ]}
+                            onPress={() => setSelectedPlan('annual')}
+                        >
+                            <View style={styles.badgeContainer}>
+                                <Text style={styles.badgeText}>Save 20% off</Text>
+                            </View>
+                            <View style={styles.planDetails}>
+                                <Text style={styles.planTitle}>Annual</Text>
+                                <View style={styles.priceContainer}>
+                                    <Text style={styles.planPrice}>$ 95</Text>
+                                    <Text style={styles.planPeriod}> / year</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.selectorCircle, selectedPlan === 'annual' && styles.selectorCircleSelected]}>
+                                {selectedPlan === 'annual' && <View style={styles.selectorInnerCircle} />}
+                            </View>
+                        </Pressable>
+
+                        {/* Monthly Plan Option */}
+                        <Pressable
+                            style={[
+                                styles.planOption,
+                                selectedPlan === 'monthly' && styles.planOptionSelected,
+                            ]}
+                            onPress={() => setSelectedPlan('monthly')}
+                        >
+                            <View style={styles.planDetails}>
+                                <Text style={styles.planTitle}>Monthly</Text>
+                                <View style={styles.priceContainer}>
+                                    <Text style={styles.planPrice}>$ 9.9</Text>
+                                    <Text style={styles.planPeriod}> / month</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.selectorCircle, selectedPlan === 'monthly' && styles.selectorCircleSelected]}>
+                                {selectedPlan === 'monthly' && <View style={styles.selectorInnerCircle} />}
+                            </View>
+                        </Pressable>
                     </View>
 
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.planOption,
-                            selectedPlan === 'annual' && styles.planOptionSelected,
-                            pressed && styles.planOptionPressed
-                        ]}
-                        onPress={() => setSelectedPlan('annual')}
-                    >
-                        <View style={styles.badgeContainer}>
-                            <Text style={styles.badgeText}>Save 20% off</Text>
-                        </View>
-                        <View style={styles.planDetails}>
-                            <Text style={styles.planTitle}>Annual</Text>
-                            {/* --- 按您的要求修改: 将周期文本的样式与价格对齐 --- */}
-                            <Text style={styles.planPrice}>$ 95 <Text style={styles.planPeriod}>/ year</Text></Text>
-                        </View>
-                        <View style={[styles.selectorCircle, selectedPlan === 'annual' && styles.selectorCircleSelected]}>
-                            {selectedPlan === 'annual' && <View style={styles.selectorInnerCircle} />}
-                        </View>
-                    </Pressable>
+                    {/* --- NEW: This flexible spacer pushes the button and footer to the bottom --- */}
+                    <View style={styles.spacer} />
 
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.planOption,
-                            selectedPlan === 'monthly' && styles.planOptionSelected,
-                            pressed && styles.planOptionPressed
-                        ]}
-                        onPress={() => setSelectedPlan('monthly')}
-                    >
-                        <View style={styles.planDetails}>
-                            <Text style={styles.planTitle}>Monthly</Text>
-                            {/* --- 按您的要求修改: 将周期文本的样式与价格对齐 --- */}
-                            <Text style={styles.planPrice}>$ 9.9 <Text style={styles.planPeriod}>/ month</Text></Text>
-                        </View>
-                        <View style={[styles.selectorCircle, selectedPlan === 'monthly' && styles.selectorCircleSelected]}>
-                            {selectedPlan === 'monthly' && <View style={styles.selectorInnerCircle} />}
-                        </View>
-                    </Pressable>
-
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.ctaButton,
-                            pressed && styles.ctaButtonPressed
-                        ]}
-                        onPress={handleStartPress}
-                    >
-                        <LinearGradient
-                            colors={['#4A4849', '#292927']}
-                            start={{ x: 0.5, y: 0 }}
-                            end={{ x: 0.5, y: 1 }}
-                            style={styles.ctaGradient}
+                    <View>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.ctaButton,
+                                pressed && styles.ctaButtonPressed
+                            ]}
+                            onPress={handleStartPress}
                         >
-                            <Text style={styles.ctaButtonText}>Start</Text>
-                        </LinearGradient>
-                    </Pressable>
+                            <LinearGradient
+                                colors={['#383838', '#1E1E1E']}
+                                start={{ x: 0.5, y: 0 }}
+                                end={{ x: 0.5, y: 1 }}
+                                style={styles.ctaGradient}
+                            >
+                                <Text style={styles.ctaButtonText}>Start</Text>
+                            </LinearGradient>
+                        </Pressable>
 
-                    {/* --- 按您的要求修改: 使用嵌套 Text 组件来实现部分文本加粗 --- */}
-                    <Text style={styles.footerText}>
-                        Terms of <Text style={styles.footerLink}>Service</Text> · <Text style={styles.footerLink}>Privacy Policy</Text>
-                    </Text>
+                        <Text style={styles.footerText}>
+                            Terms of Service · Privacy Policy
+                        </Text>
+                    </View>
                 </ScrollView>
             </SafeAreaView>
         </LinearGradient>
     );
 }
 
+// StyleSheet for all the components on this screen.
 const styles = StyleSheet.create({
     gradientBackground: {
         flex: 1,
@@ -153,21 +164,21 @@ const styles = StyleSheet.create({
     backButtonIcon: {
         width: 24,
         height: 24,
-        tintColor: '#000',
+        tintColor: '#000000',
     },
     scrollContent: {
         paddingHorizontal: 24,
         paddingBottom: 40,
+        flexGrow: 1, // MODIFIED: Allows the container to grow and fill the screen
+        flexDirection: 'column', // MODIFIED: Ensure children are laid out vertically
+        justifyContent: 'space-between', // MODIFIED: Pushes content apart
     },
     title: {
         fontSize: 32,
         fontWeight: 'bold',
-        color: '#020F20',
+        color: '#000000',
         textAlign: 'center',
-        marginBottom: 32,
-        textShadowColor: 'rgba(2, 15, 32, 0.15)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4,
+        marginBottom: 40,
     },
     featuresList: {
         marginBottom: 40,
@@ -181,7 +192,7 @@ const styles = StyleSheet.create({
     featureIconImage: {
         width: 24,
         height: 24,
-        tintColor: '#5A42E6',
+        tintColor: '#000000',
     },
     featureTextContainer: {
         flex: 1,
@@ -204,70 +215,71 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 20,
         borderWidth: 2,
-        borderColor: 'transparent',
+        borderColor: '#F3F4F6',
         marginBottom: 16,
         position: 'relative',
-        shadowColor: "#5A42E6",
+        shadowColor: "#000000",
         shadowOffset: {
             width: 0,
             height: 4,
         },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 15,
         elevation: 5,
     },
     planOptionSelected: {
-        borderColor: '#5A42E6',
-        backgroundColor: '#FFFFFF',
-        shadowOpacity: 0.2,
+        borderColor: '#0F172A',
+        shadowColor: '#020F20',
         shadowOffset: {
             width: 0,
             height: 6,
         },
-    },
-    planOptionPressed: {
-        transform: [{ scale: 0.99 }],
-        opacity: 0.95,
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
+        elevation: 12,
     },
     planDetails: {
         flex: 1,
+        gap: 4,
     },
     planTitle: {
         fontSize: 16,
         fontWeight: '600',
         color: '#1F2937',
     },
+    priceContainer: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        marginTop: 4,
+    },
     planPrice: {
-        fontSize: 28,
+        fontSize: 34,
         fontWeight: 'bold',
         color: '#0F172A',
-        marginTop: 8,
     },
-    // --- 按您的要求修改: 将周期文本的样式与价格对齐 ---
     planPeriod: {
-        fontSize: 28,          // 字体大小与价格一致
-        fontWeight: 'bold',   // 字体粗细与价格一致
-        color: '#0F172A',      // 字体颜色与价格一致
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6B7280',
     },
     selectorCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         borderWidth: 2,
         borderColor: '#E5E7EB',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F9FAFB',
-    },
-    selectorCircleSelected: {
-        borderColor: '#5A42E6',
         backgroundColor: '#FFFFFF',
     },
+    selectorCircleSelected: {
+        borderColor: '#0F172A',
+    },
     selectorInnerCircle: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: '#5A42E6',
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#0F172A',
     },
     badgeContainer: {
         position: 'absolute',
@@ -278,32 +290,31 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         borderRadius: 99,
         zIndex: 1,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
     badgeText: {
-        color: '#FFF',
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: 'bold',
     },
+    // NEW: Flexible spacer view
+    spacer: {
+        flex: 1,
+    },
     ctaButton: {
-        marginTop: 24,
+        marginTop: 24, // A small top margin to ensure space from content above
         borderRadius: 99,
         shadowColor: '#000000',
         shadowOffset: {
             width: 0,
             height: 10,
         },
-        shadowOpacity: 0.06,
-        shadowRadius: 40,
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
         elevation: 8,
         overflow: 'hidden',
     },
     ctaGradient: {
-        paddingVertical: 18,
+        paddingVertical: 20,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -316,16 +327,10 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         letterSpacing: 0.5,
     },
-    // --- 按您的要求修改: 页脚样式 ---
     footerText: {
         textAlign: 'center',
-        color: '#9CA3AF',
-        fontSize: 12,
+        color: '#6B7280',
+        fontSize: 13,
         marginTop: 24,
-    },
-    // --- 新增: 为页脚中的可点击链接添加加粗样式 ---
-    footerLink: {
-        fontWeight: 'bold',
-        color: '#808795', // 使用一个比普通文本稍深的颜色以示区别
     },
 });
