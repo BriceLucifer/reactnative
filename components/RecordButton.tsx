@@ -11,6 +11,7 @@ export default function RecordButton({ onPress }:{ onPress:()=>void }) {
     );
 }
 const styles = StyleSheet.create({
-    btn:{ height:48, borderRadius:16, backgroundColor:'#0B2239', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8 },
-    icon:{ color:'#fff', fontSize:16 }, txt:{ color:'#fff', fontSize:14, fontWeight:'600' },
+    btn:{ height:48, borderRadius:16, backgroundColor:'#0B2239', flexDirection:'row', alignItems:'center', justifyContent:'center' },
+    icon:{ color:'#fff', fontSize:16 },
+    txt:{ color:'#fff', fontSize:14, fontWeight:'600', marginLeft:8 },
 });
